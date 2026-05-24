@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>维创AI - 后台管理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #16c6af;
+      --primary-dark: #12a895;
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --success: #27ae60;
+      --bg: #f0f2f5;
+      --card: #fff;
+      --text: #333;
+      --text-light: #999;
+      --border: #e8e8e8;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ===== 登录页 ===== */
+    .login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #16c6af 0%, #0ea88e 100%); }
+    .login-box { background: #fff; border-radius: 12px; padding: 32px 36px; width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    .login-box h1 { text-align: center; font-size: 22px; margin-bottom: 6px; color: var(--primary); }
+    .login-box p { text-align: center; color: var(--text-light); margin-bottom: 20px; font-size: 13px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: #555; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; outline: none; transition: border-color 0.2s;
+    }
+    .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; resize: vertical; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; font-weight: 500; }
+    .btn-primary { background: var(--primary); color: #fff; width: 100%; padding: 12px; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ===== 布局 ===== */
+.admin-layout { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: #001529; color: #fff; flex-shrink: 0; display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; }
+    .sidebar-logo { padding: 20px 16px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; }
+    .sidebar-logo span { color: var(--primary); }
+    .sidebar-menu { flex: 1; padding: 12px 0; }
+    .menu-item { padding: 12px 24px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.65); }
+    .menu-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .menu-item.active { color: #fff; background: var(--primary); }
+    .menu-item .icon { width: 20px; text-align: center; }
+    .sidebar-footer { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-footer .btn { width: 100%; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.65); padding: 8px; font-size: 12px; }
+    .sidebar-footer .btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+    .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-left: 220px; }
+    .topbar { background: var(--card); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); z-index: 10; }
+    .topbar h2 { font-size: 16px; font-weight: 600; }
+    .topbar-info { font-size: 13px; color: var(--text-light); }
+
+    .page-content { flex: 1; padding: 24px; overflow-y: auto; }
+
+    /* ===== 卡片 ===== */
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: var(--shadow); }
+    .stat-card .label { font-size: 13px; color: var(--text-light); margin-bottom: 8px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; }
+    .stat-card .value.green { color: var(--success); }
+    .stat-card .value.blue { color: #3498db; }
+    .stat-card .value.orange { color: var(--warning); }
+    .stat-card .value.purple { color: #9b59b6; }
+
+    /* ===== 表格 ===== */
+    .card { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .card-header h3 { font-size: 15px; font-weight: 600; }
+    .card-body { padding: 0; }
+    .hairstyle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+    .hairstyle-card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+    .hairstyle-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+    .hairstyle-card-img { width: 100%; aspect-ratio: 4/5; object-fit: cover; background: #f5f5f5; display: block; }
+    .hairstyle-card-body { padding: 10px; }
+    .hairstyle-card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hairstyle-card-meta { font-size: 11px; color: #999; margin-bottom: 8px; }
+    .hairstyle-card-actions { display: flex; gap: 6px; }
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar input, .toolbar select { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+    .toolbar input:focus, .toolbar select:focus { border-color: var(--primary); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th { padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--text-light); background: #fafafa; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f5f5f5; }
+    tbody tr:hover { background: #fafafa; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+    .badge-success { background: #e8f8f0; color: var(--success); }
+    .badge-warning { background: #fef5e7; color: var(--warning); }
+    .badge-danger { background: #fde8e8; color: var(--danger); }
+    .badge-info { background: #e8f4fd; color: #3498db; }
+    .badge-default { background: #f5f5f5; color: #999; }
+
+    .pagination { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; font-size: 13px; color: var(--text-light); }
+    .pagination .btn { margin: 0 4px; }
+
+    .actions { display: flex; gap: 6px; }
+
+    /* ===== 模态框 ===== */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    .modal { background: #fff; border-radius: 12px; width: 520px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,0.2); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h3 { font-size: 16px; }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); padding: 4px; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* ===== Toast ===== */
+    .toast-container { position: fixed; top: 24px; right: 24px; z-index: 2000; }
+    .toast { padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; color: #fff; font-size: 14px; animation: slideIn 0.3s ease; }
+    .toast-success { background: var(--success); }
+    .toast-error { background: var(--danger); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ===== 空状态 ===== */
+    .empty { text-align: center; padding: 48px; color: var(--text-light); }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* ===== 加载 ===== */
+    .loading { text-align: center; padding: 48px; color: var(--text-light); }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== 配置页 ===== */
+    .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+    .config-section { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); }
+    .config-section h3 { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 15px; }
+    .config-section .form-group { padding: 0 20px; margin-top: 16px; }
+    .config-section .form-actions { padding: 16px 20px; display: flex; justify-content: flex-end; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- Toast容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- 登录页 -->
+<div class="login-page" id="loginPage">
+  <div class="login-box">
+    <h1>维创AI</h1>
+    <p>后台管理系统</p>
+    <div id="loginStep1">
+      <div class="form-group"><label>管理员账号</label><input type="text" id="loginUsername" placeholder="请输入账号"></div>
+      <div class="form-group"><label>密码</label><input type="password" id="loginPassword" placeholder="请输入密码"></div>
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<!-- 管理后台 -->
+<div class="admin-layout hidden" id="adminLayout">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-logo">维创AI 管理</div>
+    <div class="sidebar-menu">
+      <div class="menu-item active" onclick="switchPage('dashboard', this)">
+        <span class="icon">📊</span> 数据概览
+      </div>
+      <div class="menu-item" onclick="switchPage('users', this)">
+        <span class="icon">👥</span> 用户管理
+      </div>
+      <div class="menu-item" onclick="switchPage('orders', this)">
+        <span class="icon">📋</span> 订单管理
+      </div>
+      <div class="menu-item" onclick="switchPage('usage', this)">
+        <span class="icon">🔄</span> 使用记录
+      </div>
+      <div class="menu-item" onclick="switchPage('hairstyles', this)">
+        <span class="icon">💇‍♀️</span> 发型管理
+      </div>
+      <div class="menu-item" onclick="switchPage('categories', this)">
+        <span class="icon">🏷️</span> 分类管理
+      </div>
+      <div class="menu-item" onclick="switchPage('agents', this)">
+        <span class="icon">🤝</span> 代理管理
+      </div>
+      <div class="menu-item" onclick="switchPage('withdrawals', this)">
+        <span class="icon">💸</span> 提现管理
+      </div>
+      <div class="menu-item" onclick="switchPage('config', this)">
+        <span class="icon">⚙️</span> API配置
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn" onclick="doLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="pageTitle">数据概览</h2>
+      <div class="topbar-info" id="topbarInfo"></div>
+    </div>
+
+    <div class="page-content">
+      <!-- 数据概览 -->
+      <div id="page-dashboard">
+        <div class="stat-cards" id="statCards">
+          <div class="stat-card"><div class="label">总用户数</div><div class="value blue" id="statUsers">-</div></div>
+          <div class="stat-card"><div class="label">总订单数</div><div class="value purple" id="statOrders">-</div></div>
+          <div class="stat-card"><div class="label">总使用次数</div><div class="value orange" id="statUsage">-</div></div>
+          <div class="stat-card"><div class="label">今日订单</div><div class="value" id="statTodayOrders">-</div></div>
+          <div class="stat-card"><div class="label">总收入 (元)</div><div class="value green" id="statRevenue">-</div></div>
+          <div class="stat-card"><div class="label">今日收入 (元)</div><div class="value green" id="statTodayRevenue">-</div></div>
+        </div>
+      </div>
+
+      <!-- 用户管理 -->
+      <div id="page-users" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>用户列表</h3>
+            <div class="toolbar">
+              <input type="text" id="userKeyword" placeholder="搜索昵称/手机号" style="width:180px">
+              <button class="btn btn-primary btn-sm" onclick="loadUsers()">搜索</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>ID</th><th>昵称</th><th>手机号</th><th>剩余次数</th><th>注册时间</th><th>操作</th></tr></thead>
+              <tbody id="userTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="userPagination"></div>
+        </div>
+      </div>
+
+      <!-- 订单管理 -->
+      <div id="page-orders" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>订单列表</h3>
+            <div class="toolbar">
+              <select id="orderStatusFilter" onchange="loadOrders()">
+                <option value="">全部状态</option>
+                <option value="pending">待支付</option>
+                <option value="paid">已支付</option>
+                <option value="failed">已失败</option>
+              </select>
+              <input type="text" id="orderKeyword" placeholder="搜索openid/订单号" style="width:180px">
+              <button class="btn btn-primary btn-sm" onclick="loadOrders()">搜索</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>订单号</th><th>用户</th><th>购买次数</th><th>金额</th><th>赠送</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="orderTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="orderPagination"></div>
+        </div>
+      </div>
+
+      <!-- 使用记录 -->
+      <div id="page-usage" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>使用记录</h3>
+            <div class="toolbar">
+              <select id="usageStatusFilter" onchange="loadUsage()">
+                <option value="">全部状态</option>
+                <option value="queued">排队中</option>
+                <option value="processing">处理中</option>
+                <option value="completed">已完成</option>
+                <option value="failed">已失败</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>记录ID</th><th>用户</th><th>类型</th><th>消耗</th><th>状态</th><th>创建时间</th></tr></thead>
+              <tbody id="usageTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="usagePagination"></div>
+        </div>
+      </div>
+
+      <!-- 发型管理 -->
+      <div id="page-hairstyles" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>发型列表</h3>
+            <div class="toolbar">
+              <select id="hairstyleCategoryFilter" onchange="loadHairstyles()">
+                <option value="">全部分类</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="showHairstyleModal()">+ 新增发型</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:16px;">
+            <div id="hairstyleGrid" class="hairstyle-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分类管理 -->
+      <div id="page-categories" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>发型分类</h3>
+            <div class="toolbar">
+              <button class="btn btn-primary btn-sm" onclick="showCategoryModal()">+ 新增分类</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>分类名称</th><th>分类Key</th><th>排序</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="categoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 代理管理 -->
+      <div id="page-agents" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>代理列表</h3>
+            <div class="toolbar">
+              <input type="text" id="agentKeyword" placeholder="搜索姓名/手机号/邀请码" style="width:200px">
+              <button class="btn btn-primary btn-sm" onclick="loadAgents()">搜索</button>
+              <button class="btn btn-success btn-sm" onclick="showAgentModal()">+ 新增代理</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>姓名</th><th>手机号</th><th>邀请码</th><th>佣金比例%</th><th>累计收益</th><th>推荐人数</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="agentTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="agentPagination"></div>
+        </div>
+      </div>
+
+      <!-- 提现管理 -->
+      <div id="page-withdrawals" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>提现申请列表</h3>
+            <div class="toolbar">
+              <select id="withdrawalStatusFilter" onchange="loadWithdrawals()">
+                <option value="">全部状态</option>
+                <option value="pending">待转账</option>
+                <option value="completed">已完成转账</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="loadWithdrawals()">刷新</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>订单号</th><th>申请人</th><th>手机号</th><th>支付宝账号</th><th>支付宝实名</th><th>提现金额(元)</th><th>可提现余额</th><th>状态</th><th>申请时间</th><th>操作</th></tr></thead>
+              <tbody id="withdrawalTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="withdrawalPagination"></div>
+        </div>
+      </div>
+
+      <!-- API配置 -->
+      <div id="page-config" class="hidden">
+        <div class="config-grid">
+          <!-- 价格 & 全局配置 -->
+          <div class="config-section">
+            <h3>💰 价格 & 全局配置</h3>
+            <div class="form-group">
+              <label>AI换发价格 (次/元)</label>
+              <input type="number" id="cfgPriceNormal" min="0" step="0.1">
+            </div>
+            <div class="form-group">
+              <label>全局最大并发数</label>
+              <input type="number" id="cfgMaxConcurrent" min="1" max="200" placeholder="100">
+              <div style="font-size:12px;color:#999;margin-top:4px;">AI换发任务的总并发限制</div>
+            </div>
+            <div class="form-group">
+              <label>欢迎语</label>
+              <input type="text" id="cfgWelcome">
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+            </div>
+          </div>
+
+          <!-- AI换发 接口配置 -->
+          <div class="config-section">
+            <h3>💇‍♀️ AI换发 接口配置</h3>
+            <div class="form-group">
+              <label>API 地址</label>
+              <input type="text" id="cfgTryonApiUrl" placeholder="https://api.apiyi.com/v1">
+            </div>
+            <div class="form-group">
+              <label>模型名称</label>
+              <input type="text" id="cfgTryonModel" placeholder="gemini-3.1-flash-image-preview">
+            </div>
+            <div class="form-group">
+              <label>提示词</label>
+              <textarea id="cfgTryonPrompt" rows="3" placeholder="请将第一张图中人物的发型替换为第二张图中的发型，保持人物面部不变"></textarea>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="saveApiConfig('tryon')">保存换发配置</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框容器 -->
+<div id="modalContainer"></div>
+
+<script>
+// ===== 全局变量 =====
+const API_BASE = '';
+let adminToken = '';
+let currentPage = 'dashboard';
+let lastPendingCount = 0;
+
+// 分页状态
+const pageState = {
+  users: { page: 1, total: 0, pageSize: 15 },
+  orders: { page: 1, total: 0, pageSize: 15 },
+  usage: { page: 1, total: 0, pageSize: 15 },
+  hairstyles: { page: 1, total: 0, pageSize: 1000 },
+  agents: { page: 1, total: 0, pageSize: 15 }
+};
+
+// ===== API调用 =====
+async function callApi(action, data = {}) {
+  console.log('[API] Request:', action, data, 'token:', adminToken ? 'present' : 'missing');
+  const res = await fetch(`${API_BASE}/api/admin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, data, adminToken })
+  });
+  console.log('[API] Response status:', res.status);
+  const json = await res.json();
+  console.log('[API] Response:', json);
+  if (json.code !== 0) throw new Error(json.message || '请求失败');
+  return json;
+}
+
+// 兼容旧代码
+const callAdmin = callApi;
+
+// ===== Toast =====
+function showToast(msg, type) {
+  type = type || 'success';
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ===== 登录 =====
+async function doLogin() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!username || !password) {
+    showToast('请输入账号和密码', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', data: { username, password } })
+    });
+    const json = await res.json();
+    if (json.code !== 0) throw new Error(json.message || '登录失败');
+    adminToken = json.data.token;
+    localStorage.setItem('admin_token', adminToken);
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('adminLayout').classList.remove('hidden');
+    loadDashboard();
+    startSessionTimer();
+    showToast('登录成功');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ===== 会话超时管理 =====
+let sessionTimer = null;
+let lastActivity = Date.now();
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30分钟无操作自动掉线
+
+function startSessionTimer() {
+  stopSessionTimer();
+  lastActivity = Date.now();
+  sessionTimer = setInterval(() => {
+    if (adminToken && Date.now() - lastActivity > SESSION_TIMEOUT) {
+      console.log('会话超时，自动退出');
+      showToast('登录已过期，请重新扫码登录', 'error');
+      doLogout();
+    }
+  }, 60000); // 每分钟检查一次
+}
+
+function stopSessionTimer() {
+  if (sessionTimer) {
+    clearInterval(sessionTimer);
+    sessionTimer = null;
+  }
+}
+
+function recordActivity() {
+  if (adminToken) lastActivity = Date.now();
+}
+document.addEventListener('mousemove', recordActivity, true);
+document.addEventListener('keydown', recordActivity, true);
+document.addEventListener('click', recordActivity, true);
+document.addEventListener('scroll', recordActivity, true);
+
+function doLogout() {
+  adminToken = '';
+  localStorage.removeItem('admin_token');
+  stopSessionTimer();
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('adminLayout').classList.add('hidden');
+}
+
+// ===== 页面切换 =====
+function switchPage(page, el) {
+  currentPage = page;
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+  document.getElementById('page-' + page).classList.remove('hidden');
+
+  const titles = { dashboard:'数据概览', users:'用户管理', orders:'订单管理', usage:'使用记录', hairstyles:'发型管理', categories:'分类管理', agents:'代理管理', withdrawals:'提现管理', config:'API配置' };
+  document.getElementById('pageTitle').textContent = titles[page] || '';
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'users') loadUsers();
+  if (page === 'orders') loadOrders();
+  if (page === 'usage') loadUsage();
+  if (page === 'hairstyles') loadHairstyles();
+  if (page === 'categories') loadCategories();
+  if (page === 'agents') loadAgents();
+  if (page === 'withdrawals') loadWithdrawals();
+  if (page === 'config') loadConfig();
+}
+
+// ===== 数据概览 =====
+async function loadDashboard() {
+  try {
+    const res = await callAdmin('dashboard');
+    const d = res.data;
+    document.getElementById('statUsers').textContent = d.totalUsers;
+    document.getElementById('statOrders').textContent = d.totalOrders;
+    document.getElementById('statUsage').textContent = d.totalRecords;
+    document.getElementById('statTodayOrders').textContent = d.todayOrders;
+    document.getElementById('statRevenue').textContent = d.totalRevenue;
+    document.getElementById('statTodayRevenue').textContent = d.todayRevenue;
+  } catch (err) {
+    showToast('加载概览失败', 'error');
+  }
+}
+
+// ===== 用户管理 =====
+async function loadUsers() {
+  const s = pageState.users;
+  const keyword = document.getElementById('userKeyword').value.trim();
+  try {
+    const res = await callAdmin('userList', { page: s.page, pageSize: s.pageSize, keyword });
+    s.total = res.data.total;
+    renderUserTable(res.data.list);
+    renderPagination('userPagination', s, loadUsers);
+  } catch (err) { showToast('加载用户失败', 'error'); }
+}
+
+function renderUserTable(list) {
+  const tbody = document.getElementById('userTableBody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty">暂无数据</div></td></tr>'; return; }
+  tbody.innerHTML = list.map(u => `<tr>
+    <td title="${u.openid || ''}">${(u.openid || '').substring(0, 8)}...</td>
+    <td>${u.nickName || '微信用户'}</td>
+    <td>${u.phone || '-'}</td>
+    <td><strong>${u.quota || 0}</strong></td>
+    <td>${formatDate(u.createdAt)}</td>
+    <td class="actions">
+      <button class="btn btn-sm btn-outline" onclick='showUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>编辑</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteUser('${u._id}')">删除</button>
+    </td>
+  </tr>`).join('');
+}
+
+function showUserModal(user) {
+  const isEdit = !!user;
+  const u = user || {};
+  showModal('用户编辑', `
+    <div class="form-group"><label>昵称</label><input type="text" id="editNickName" value="${u.nickName || ''}"></div>
+    <div class="form-group"><label>手机号</label><input type="text" id="editPhone" value="${u.phone || ''}"></div>
+    <div class="form-group"><label>剩余次数</label><input type="number" id="editBalance" value="${u.balance || 0}"></div>
+    <div class="form-group"><label>头像URL</label><input type="text" id="editAvatarUrl" value="${u.avatarUrl || ''}"></div>
+  `, async () => {
+    await callAdmin('userUpdate', {
+      _id: u._id,
+      nickName: document.getElementById('editNickName').value,
+      phone: document.getElementById('editPhone').value,
+      balance: document.getElementById('editBalance').value,
+      avatarUrl: document.getElementById('editAvatarUrl').value
+    });
+    showToast('更新成功');
+    loadUsers();
+  });
+}
+
+async function deleteUser(id) {
+  if (!confirm('确定删除该用户？此操作不可恢复！')) return;
+  await callAdmin('userDelete', { _id: id });
+  showToast('删除成功');
+  loadUsers();
+}
+
+// ===== 订单管理 =====
+async function loadOrders() {
+  const s = pageState.orders;
+  const status = document.getElementById('orderStatusFilter').value;
+  const keyword = document.getElementById('orderKeyword').value.trim();
+  try {
+    const res = await callAdmin('orderList', { page: s.page, pageSize: s.pageSize, status, keyword });
+    s.total = res.data.total;
+    renderOrderTable(res.data.list);
+    renderPagination('orderPagination', s, loadOrders);
+  } catch (err) { showToast('加载订单失败', 'error'); }
+}
+
+function renderOrderTable(list) {
+  const tbody = document.getElementById('orderTableBody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty">暂无数据</div></td></tr>'; return; }
+  tbody.innerHTML = list.map(o => {
+    const statusMap = { pending: ['待支付','warning'], paid: ['已支付','success'], failed: ['已失败','danger'] };
+    const [label, cls] = statusMap[o.status] || [o.status, 'default'];
+    return `<tr>
+      <td title="${o._id}">${o._id.substring(0, 10)}...</td>
+      <td title="${o.openid}">${(o.openid || '').substring(0, 8)}...</td>
+      <td>${o.amount || 0} 次</td>
+      <td>${o.amount}元</td>
+      <td>${o.bonus ? '+' + o.bonus : '-'}</td>
+      <td><span class="badge badge-${cls}">${label}</span></td>
+      <td>${formatDate(o.createdAt)}</td>
+      <td class="actions">
+        ${o.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="markPaid('${o._id}')">确认支付</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function markPaid(id) {
+  if (!confirm('确认标记为已支付？将自动为用户充值余额。')) return;
+  await callAdmin('orderUpdate', { _id: id, status: 'paid' });
+  showToast('已确认支付');
+  loadOrders();
+}
+
+// ===== 使用记录 =====
+async function loadUsage() {
+  const s = pageState.usage;
+  const status = document.getElementById('usageStatusFilter').value;
+  try {
+    const res = await callAdmin('usageList', { page: s.page, pageSize: s.pageSize, status });
+    s.total = res.data.total;
+    renderUsageTable(res.data.list);
+    renderPagination('usagePagination', s, loadUsage);
+  } catch (err) { showToast('加载记录失败', 'error'); }
+}
+
+function renderUsageTable(list) {
+  const tbody = document.getElementById('usageTableBody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty">暂无数据</div></td></tr>'; return; }
+  tbody.innerHTML = list.map(r => {
+    const statusMap = { queued:['排队中','default'], pending:['待处理','warning'], processing:['处理中','info'], completed:['已完成','success'], failed:['已失败','danger'] };
+    const [label, cls] = statusMap[r.status] || [r.status, 'default'];
+    return `<tr>
+      <td title="${r._id}">${r._id.substring(0, 10)}...</td>
+      <td title="${r.openid}">${(r.openid || '').substring(0, 8)}...</td>
+      <td>${r.type === 'tryon' ? '换发' : r.type === 'avatar' ? '头像' : r.type}</td>
+      <td>${r.cost || 0}次</td>
+      <td><span class="badge badge-${cls}">${label}</span></td>
+      <td>${formatDate(r.createdAt)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 全局缓存分类列表
+let cachedCategories = [];
+
+// ===== 发型管理 =====
+async function loadHairstyles() {
+  const s = pageState.hairstyles;
+  const category = document.getElementById('hairstyleCategoryFilter').value;
+  try {
+    // 加载分类（缓存）
+    const catRes = await callAdmin('categoryList', {});
+    cachedCategories = catRes.data || [];
+    const catSelect = document.getElementById('hairstyleCategoryFilter');
+    if (catSelect.options.length <= 1) {
+      cachedCategories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.ckey;
+        opt.textContent = c.name;
+        catSelect.appendChild(opt);
+      });
+    }
+
+    const res = await callAdmin('hairstyleList', { page: s.page, pageSize: s.pageSize, category });
+    console.log('[loadHairstyles] API response:', res);
+    console.log('[loadHairstyles] res.data.list:', res.data.list, 'length:', res.data.list.length);
+    s.total = res.data.total;
+    renderHairstyleGrid(res.data.list, cachedCategories);
+  } catch (err) { showToast('加载发型失败', 'error'); }
+}
+
+function renderHairstyleGrid(list, categories) {
+  const grid = document.getElementById('hairstyleGrid');
+  console.log('[renderHairstyleGrid] list:', list, 'categories:', categories);
+  console.log('[renderHairstyleGrid] res.data:', typeof res !== 'undefined' ? res.data : 'res not available');
+  if (!list.length) { grid.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">暂无发型数据</div>'; return; }
+  const catMap = {};
+  (categories || []).forEach(c => catMap[c.ckey] = c.name);
+  grid.innerHTML = list.map(h => `<div class="hairstyle-card" onclick='showHairstyleModal(${JSON.stringify(h).replace(/'/g,"&#39;")})'>
+    <img class="hairstyle-card-img" src="${h.image}" alt="${h.name}" onerror="this.src='/assets/icons/default-avatar.png'">
+    <div class="hairstyle-card-body">
+      <div class="hairstyle-card-name">${h.name || '未命名'}</div>
+      <div class="hairstyle-card-meta">${catMap[h.category] || h.category || ''} · 排序${h.sort}</div>
+      ${h.hot ? '<span class="badge badge-danger" style="margin-bottom:6px;">热门</span>' : ''}
+      <div class="hairstyle-card-actions">
+        <button class="btn btn-sm btn-outline" onclick='event.stopPropagation(); showHairstyleModal(${JSON.stringify(h).replace(/'/g,"&#39;")})'>编辑</button>
+        <button class="btn btn-sm btn-danger" onclick='event.stopPropagation(); deleteHairstyle("${h.id}")'>删除</button>
+      </div>
+    </div>
+  </div>`).join('');
+}
+
+function showHairstyleModal(item) {
+  const h = item || {};
+  // 构建分类下拉选项
+  const categoryOptions = cachedCategories.map(c =>
+    `<option value="${c.ckey}" ${h.category === c.ckey ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+  const imagePreview = h.image ? `<img src="${h.image}" style="max-width:100%;max-height:120px;border-radius:8px;margin-top:8px;">` : '';
+  showModal(h.id ? '编辑发型' : '新增发型', `
+    <div class="form-group"><label>名称</label><input type="text" id="editHsName" value="${h.name || ''}"></div>
+    <div class="form-group"><label>分类</label><select id="editHsCategory"><option value="">请选择分类</option>${categoryOptions}</select></div>
+    <div class="form-group">
+      <label>发型图片</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="file" id="editHsImageFile" accept="image/*" onchange="previewHairstyleImage(this)" style="flex:1;">
+        <button class="btn btn-sm btn-outline" type="button" onclick="document.getElementById('editHsImageFile').click()">选择文件</button>
+      </div>
+      <div id="imagePreviewBox">${imagePreview}</div>
+      <input type="hidden" id="editHsImage" value="${h.image || ''}">
+      <input type="hidden" id="editHsImageFileID" value="${h.imageFileID || ''}">
+      <div style="font-size:12px;color:#999;margin-top:4px;">支持 jpg/png/webp，建议尺寸 400x500，文件不超过2MB</div>
+    </div>
+    <div class="form-group"><label>排序</label><input type="number" id="editHsSort" value="${h.sort || 0}"></div>
+    <div class="form-group"><label><input type="checkbox" id="editHsHot" ${h.hot ? 'checked' : ''}> 热门</label></div>
+  `, async () => {
+    // 先检查是否需要上传图片
+    const fileInput = document.getElementById('editHsImageFile');
+    const hiddenImage = document.getElementById('editHsImage');
+    const hiddenFileID = document.getElementById('editHsImageFileID');
+
+    let imageUrl = hiddenImage.value;
+    let imageFileID = hiddenFileID.value;
+
+    if (fileInput.files && fileInput.files[0]) {
+      // 有新选中的文件，先上传
+      const file = fileInput.files[0];
+      if (file.size > 4 * 1024 * 1024) {
+        showToast('图片不能超过4MB', 'error');
+        return;
+      }
+      try {
+        showToast('正在上传图片...', 'info');
+        const base64Data = await fileToBase64(file);
+        const category = document.getElementById('editHsCategory').value || 'other';
+        const uploadRes = await callAdmin('uploadHairstyleImage', {
+          base64Data,
+          filename: category + '_' + Date.now()
+        });
+        if (uploadRes.code === 0) {
+          imageUrl = uploadRes.data.url;
+          imageFileID = uploadRes.data.fileID;
+        } else {
+          showToast('图片上传失败: ' + (uploadRes.message || ''), 'error');
+          return;
+        }
+      } catch (err) {
+        showToast('图片上传失败', 'error');
+        return;
+      }
+    }
+
+    const data = {
+      name: document.getElementById('editHsName').value,
+      category: document.getElementById('editHsCategory').value,
+      image: imageUrl,
+      imageFileID: imageFileID,
+      sort: Number(document.getElementById('editHsSort').value),
+      hot: document.getElementById('editHsHot').checked
+    };
+    if (h.id) {
+      data._id = h.id;
+      await callAdmin('hairstyleUpdate', data);
+    } else {
+      await callAdmin('hairstyleCreate', data);
+    }
+    showToast('保存成功');
+    loadHairstyles();
+  });
+}
+
+// 图片预览
+function previewHairstyleImage(input) {
+  const box = document.getElementById('imagePreviewBox');
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      box.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:120px;border-radius:8px;margin-top:8px;">`;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+// 文件转 base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function deleteHairstyle(id) {
+  if (!confirm('确定删除该发型？')) return;
+  await callAdmin('hairstyleDelete', { _id: id });
+  showToast('删除成功');
+  loadHairstyles();
+}
+
+// ===== 分类管理 =====
+async function loadCategories() {
+  try {
+    const res = await callAdmin('categoryList', {});
+    cachedCategories = res.data || [];
+    renderCategoryTable(cachedCategories);
+  } catch (err) { showToast('加载分类失败', 'error'); }
+}
+
+function renderCategoryTable(list) {
+  const tbody = document.getElementById('categoryTableBody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty">暂无分类，请添加</div></td></tr>'; return; }
+  tbody.innerHTML = list.map(c => `<tr>
+    <td><strong>${c.name}</strong></td>
+    <td><code>${c.ckey || '-'}</code></td>
+    <td>${c.sort || 0}</td>
+    <td>${formatDate(c.createdAt)}</td>
+    <td class="actions">
+      <button class="btn btn-sm btn-outline" onclick='showCategoryModal(${JSON.stringify(c).replace(/'/g,"&#39;")})'>编辑</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteCategory('${c.id}')">删除</button>
+    </td>
+  </tr>`).join('');
+}
+
+function showCategoryModal(item) {
+  const c = item || {};
+  showModal(c.id ? '编辑分类' : '新增分类', `
+    <div class="form-group"><label>分类名称</label><input type="text" id="editCatName" value="${c.name || ''}" placeholder="如：长发"></div>
+    <div class="form-group"><label>分类Key</label><input type="text" id="editCatKey" value="${c.ckey || ''}" placeholder="如：long（英文标识，用于程序匹配）"></div>
+    <div class="form-group"><label>排序（数字越小越靠前）</label><input type="number" id="editCatSort" value="${c.sort || 0}"></div>
+  `, async () => {
+    const data = {
+      name: document.getElementById('editCatName').value.trim(),
+      key: document.getElementById('editCatKey').value.trim(),
+      sort: Number(document.getElementById('editCatSort').value)
+    };
+    if (!data.name || !data.key) {
+      showToast('分类名称和Key不能为空', 'error');
+      return;
+    }
+    if (c.id) {
+      data._id = c.id;
+      await callAdmin('categoryUpdate', data);
+    } else {
+      await callAdmin('categoryCreate', data);
+    }
+    showToast('保存成功');
+    loadCategories();
+    // 刷新发型页分类筛选
+    refreshCategoryFilter();
+  });
+}
+
+async function deleteCategory(id) {
+  if (!confirm('确定删除该分类？发型中引用此分类的数据不受影响。')) return;
+  await callAdmin('categoryDelete', { _id: id });
+  showToast('删除成功');
+  loadCategories();
+  refreshCategoryFilter();
+}
+
+function refreshCategoryFilter() {
+  const catSelect = document.getElementById('hairstyleCategoryFilter');
+  catSelect.innerHTML = '<option value="">全部分类</option>';
+  cachedCategories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.ckey;
+    opt.textContent = c.name;
+    catSelect.appendChild(opt);
+  });
+}
+
+// ===== 代理管理 =====
+async function loadAgents() {
+  const s = pageState.agents;
+  const keyword = document.getElementById('agentKeyword').value.trim();
+  try {
+    const res = await callAdmin('agentList', { page: s.page, pageSize: s.pageSize, keyword });
+    s.total = res.data.total;
+    renderAgentTable(res.data.list);
+    renderPagination('agentPagination', s, loadAgents);
+  } catch (err) { showToast('加载代理失败', 'error'); }
+}
+
+function renderAgentTable(list) {
+  const tbody = document.getElementById('agentTableBody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty">暂无数据</div></td></tr>'; return; }
+  tbody.innerHTML = list.map(a => {
+    const statusMap = {
+      pending: ['待审核', 'badge-warning'],
+      active: ['正常', 'badge-success'],
+      disabled: ['禁用', 'badge-danger']
+    };
+    const [statusText, statusClass] = statusMap[a.status] || [a.status, 'badge-default'];
+
+    let actions = '';
+    if (a.status === 'pending') {
+      actions = `<button class="btn btn-sm btn-success" onclick="approveAgent('${a._id}')">批准</button>
+                 <button class="btn btn-sm btn-danger" onclick="rejectAgent('${a._id}')">拒绝</button>`;
+    } else if (a.status === 'active') {
+      actions = `<button class="btn btn-sm btn-outline" onclick='copyAgentLink("${a.code}", "${a.name || ''}")'>📎 复制链接</button>
+                 <button class="btn btn-sm btn-outline" onclick='showAgentModal(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
+                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a._id}')">删除</button>`;
+    } else {
+      actions = `<button class="btn btn-sm btn-outline" onclick='showAgentModal(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
+                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a._id}')">删除</button>`;
+    }
+
+    return `<tr>
+    <td>${a.name || '-'}</td>
+    <td>${a.phone || '-'}</td>
+    <td><code>${a.code || ''}</code></td>
+    <td>${a.commission || 0}%</td>
+    <td>${a.totalEarned || 0}元</td>
+    <td>${a.totalReferred || 0}</td>
+    <td><span class="badge ${statusClass}">${statusText}</span></td>
+    <td>${a.openid ? a.openid.substring(0, 8) + '...' : '-'}</td>
+    <td class="actions">${actions}</td>
+  </tr>`;
+  }).join('');
+}
+
+// 复制代理推广链接
+function copyAgentLink(code, name) {
+  const baseUrl = window.location.origin;
+  const link = baseUrl + '/?agent=' + encodeURIComponent(code);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function() {
+      showToast('推广链接已复制到剪贴板');
+    }).catch(function() {
+      fallbackCopy(link);
+    });
+  } else {
+    fallbackCopy(link);
+  }
+}
+
+function fallbackCopy(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast('推广链接已复制到剪贴板');
+  } catch (err) {
+    showToast('复制失败，请手动复制', 'error');
+  }
+  document.body.removeChild(textarea);
+}
+
+async function approveAgent(id) {
+  if (!confirm('确定批准该代理申请？批准后用户将成为正式代理。')) return;
+  try {
+    await callAdmin('agentUpdate', { _id: id, status: 'active' });
+    showToast('已批准代理申请');
+    loadAgents();
+  } catch (err) { showToast('操作失败: ' + err.message, 'error'); }
+}
+
+async function rejectAgent(id) {
+  if (!confirm('确定拒绝该代理申请？')) return;
+  try {
+    await callAdmin('agentUpdate', { _id: id, status: 'rejected' });
+    showToast('已拒绝代理申请');
+    loadAgents();
+  } catch (err) { showToast('操作失败: ' + err.message, 'error'); }
+}
+
+function showAgentModal(agent) {
+  const a = agent || {};
+  showModal(a._id ? '编辑代理' : '新增代理', `
+    <div class="form-group"><label>姓名</label><input type="text" id="editAgName" value="${a.name || ''}"></div>
+    <div class="form-group"><label>手机号</label><input type="text" id="editAgPhone" value="${a.phone || ''}"></div>
+    ${!a._id ? '<div class="form-group"><label>邀请码 (留空自动生成)</label><input type="text" id="editAgCode" value=""></div>' : ''}
+    <div class="form-group"><label>佣金比例 (%)</label><input type="number" id="editAgCommission" value="${a.commission || 30}" min="0" max="100"></div>
+    <div class="form-group"><label>状态</label><select id="editAgStatus"><option value="active" ${a.status === 'active' ? 'selected' : ''}>正常</option><option value="disabled" ${a.status === 'disabled' ? 'selected' : ''}>禁用</option></select></div>
+    ${a._id ? `<div class="form-group"><label>余额</label><input type="number" id="editAgBalance" value="${a.balance || 0}"></div>` : ''}
+  `, async () => {
+    const data = {
+      name: document.getElementById('editAgName').value,
+      phone: document.getElementById('editAgPhone').value,
+      commission: document.getElementById('editAgCommission').value,
+      status: document.getElementById('editAgStatus').value
+    };
+    if (a._id) {
+      data._id = a._id;
+      data.balance = document.getElementById('editAgBalance').value;
+      await callAdmin('agentUpdate', data);
+    } else {
+      const codeEl = document.getElementById('editAgCode');
+      if (codeEl) data.code = codeEl.value;
+      await callAdmin('agentCreate', data);
+    }
+    showToast('保存成功');
+    loadAgents();
+  });
+}
+
+async function deleteAgent(id) {
+  if (!confirm('确定删除该代理？')) return;
+  await callAdmin('agentDelete', { _id: id });
+  showToast('删除成功');
+  loadAgents();
+}
+
+// ===== 提现管理 =====
+async function loadWithdrawals() {
+  const status = document.getElementById('withdrawalStatusFilter').value;
+  try {
+    const res = await callAdmin('withdrawalList', { status });
+    renderWithdrawalTable(res.data.list);
+  } catch (err) { showToast('加载提现列表失败', 'error'); }
+}
+
+function renderWithdrawalTable(list) {
+  const tbody = document.getElementById('withdrawalTableBody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty">暂无数据</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(w => {
+    const statusMap = { pending: ['待转账', 'badge-warning'], completed: ['已完成转账', 'badge-success'] };
+    const [statusText, statusClass] = statusMap[w.status] || [w.status, 'badge-default'];
+    const actions = w.status === 'pending'
+      ? `<button class="btn btn-sm btn-success" onclick="processWithdrawal('${w._id}', 'complete')">确认完成转账</button>`
+      : `<span class="badge ${statusClass}">${statusText}</span>`;
+    return `<tr>
+      <td>${w.withdrawNo || '-'}</td>
+      <td>${w.agentName || '-'}</td>
+      <td>${w.agentPhone || '-'}</td>
+      <td>${w.alipayAccount || '-'}</td>
+      <td>${w.alipayName || '-'}</td>
+      <td><strong style="color:#e74c3c">${w.amount || 0}</strong></td>
+      <td><strong style="color:#27ae60">${w.agentBalance || 0}</strong></td>
+      <td><span class="badge ${statusClass}">${statusText}</span></td>
+      <td>${formatDate(w.createdAt)}</td>
+      <td class="actions">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function processWithdrawal(id, action) {
+  if (!confirm('确定该提现已完成转账？')) return;
+  try {
+    await callAdmin('processWithdrawal', { _id: id, action });
+    showToast('已确认完成转账');
+    loadWithdrawals();
+  } catch (err) {
+    showToast(err.message || '操作失败', 'error');
+  }
+}
+
+// ===== API配置 =====
+async function loadConfig() {
+  try {
+    const [cfgRes, tryonRes] = await Promise.all([
+      callAdmin('configGet'),
+      callAdmin('apiConfigGet', { type: 'api_tryon' })
+    ]);
+
+    // 价格 & 全局配置
+    const cfg = cfgRes.data;
+    document.getElementById('cfgPriceNormal').value = cfg.price_normal || '';
+    document.getElementById('cfgMaxConcurrent').value = cfg.max_concurrent || 100;
+    document.getElementById('cfgWelcome').value = cfg.welcome_text || '';
+
+    // AI换发配置
+    const tryon = tryonRes.data;
+    document.getElementById('cfgTryonApiUrl').value = tryon.api_url || '';
+    document.getElementById('cfgTryonModel').value = tryon.model || '';
+    document.getElementById('cfgTryonPrompt').value = tryon.prompt || '';
+  } catch (err) { showToast('加载配置失败', 'error'); }
+}
+
+async function saveConfig() {
+  try {
+    await callAdmin('configUpdate', {
+      price_normal: Number(document.getElementById('cfgPriceNormal').value) || 0,
+      welcome_text: document.getElementById('cfgWelcome').value,
+      max_concurrent: Number(document.getElementById('cfgMaxConcurrent').value) || 100
+    });
+    showToast('价格配置已保存');
+  } catch (err) { showToast('保存失败', 'error'); }
+}
+
+// 保存AI接口配置（只支持tryon）
+async function saveApiConfig(type) {
+  if (type !== 'tryon') {
+    showToast('不支持该配置类型', 'error');
+    return;
+  }
+  try {
+    await callAdmin('apiConfigUpdate', {
+      type: 'api_tryon',
+      api_url: document.getElementById('cfgTryonApiUrl').value.trim(),
+      model: document.getElementById('cfgTryonModel').value.trim(),
+      prompt: document.getElementById('cfgTryonPrompt').value.trim()
+    });
+    showToast('AI换发配置已保存');
+  } catch (err) { showToast('保存失败', 'error'); }
+}
+
+// ===== 通用：分页渲染 =====
+function renderPagination(containerId, state, loadFn) {
+  const totalPages = Math.ceil(state.total / state.pageSize) || 1;
+  const container = document.getElementById(containerId);
+  container.innerHTML = `
+    <span>共 ${state.total} 条，第 ${state.page}/${totalPages} 页</span>
+    <div>
+      <button class="btn btn-sm btn-outline" ${state.page <= 1 ? 'disabled' : ''} onclick="goPage('${loadFn.name}', ${state.page - 1})">上一页</button>
+      <button class="btn btn-sm btn-outline" ${state.page >= totalPages ? 'disabled' : ''} onclick="goPage('${loadFn.name}', ${state.page + 1})">下一页</button>
+    </div>
+  `;
+}
+
+function goPage(fnName, page) {
+  const map = { loadUsers: 'users', loadOrders: 'orders', loadUsage: 'usage', loadHairstyles: 'hairstyles', loadAgents: 'agents' };
+  const key = map[fnName];
+  if (key && page >= 1) {
+    pageState[key].page = page;
+    window[fnName]();
+  }
+}
+
+// ===== 通用：模态框 =====
+function showModal(title, bodyHtml, onConfirm) {
+  const container = document.getElementById('modalContainer');
+  container.innerHTML = `
+    <div class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header"><h3>${title}</h3><button class="modal-close" onclick="closeModal()">&times;</button></div>
+        <div class="modal-body">${bodyHtml}</div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal()">取消</button>
+          <button class="btn btn-primary" id="modalConfirmBtn">确定</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modalConfirmBtn').onclick = async () => {
+    try {
+      await onConfirm();
+      closeModal();
+    } catch (err) {
+      showToast(err.message || '操作失败', 'error');
+    }
+  };
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modalContainer').innerHTML = '';
+}
+
+// ===== 工具函数 =====
+function formatDate(d) {
+  if (!d) return '-';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '-';
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0') + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+}
+
+// ===== 自动登录检测 =====
+window.onload = async function() {
+  const savedToken = localStorage.getItem('admin_token');
+  if (savedToken) {
+    adminToken = savedToken;
+    try {
+      await loadDashboard();
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('adminLayout').classList.remove('hidden');
+      startSessionTimer();
+      return;
+    } catch (e) {
+      adminToken = '';
+      localStorage.removeItem('admin_token');
+    }
+  }
+};
+</script>
+</body>
+</html>

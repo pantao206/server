@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>维创AI - 代理推广</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      padding: 20px;
+    }
+    .container {
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    .logo {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #16c6af;
+    }
+    .desc {
+      font-size: 16px;
+      color: #999;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+    .agent-info {
+      background: rgba(22, 198, 175, 0.1);
+      border: 1px solid rgba(22, 198, 175, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .agent-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .agent-code {
+      font-size: 24px;
+      font-weight: 700;
+      color: #16c6af;
+      letter-spacing: 2px;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #16c6af, #0ea895);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(22, 198, 175, 0.4);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .tip {
+      font-size: 13px;
+      color: #666;
+      margin-top: 20px;
+    }
+    .qr-section {
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .qr-title {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 16px;
+    }
+    .qr-box {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+    .qr-box canvas {
+      display: block;
+    }
+    .loading {
+      display: none;
+      font-size: 14px;
+      color: #16c6af;
+      margin-top: 20px;
+    }
+    .loading.show {
+      display: block;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(22, 198, 175, 0.3);
+      border-top-color: #16c6af;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">💇‍♀️</div>
+    <h1>维创AI 发型助手</h1>
+    <p class="desc">智能AI换发，一键百变造型<br>点击下方按钮立即体验</p>
+
+    <div class="agent-info">
+      <div class="agent-name">推荐人：<span id="agentName">加载中...</span></div>
+      <div class="agent-code" id="agentCode">--</div>
+    </div>
+
+    <button class="btn" id="openBtn" onclick="openMiniProgram()">
+      打开小程序
+    </button>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>正在打开小程序...</div>
+    </div>
+
+    <p class="tip" id="tip">请在微信中打开此页面</p>
+
+    <div class="qr-section">
+      <p class="qr-title">或扫码打开小程序</p>
+      <div class="qr-box">
+        <canvas id="qrCanvas" width="160" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://res.wx.qq.com/t/wx_fed/WeAnalysis/4.2.1/WeAnalysis.js" async></script>
+  <script>
+    // 获取URL参数中的代理码
+    const urlParams = new URLSearchParams(window.location.search);
+    const agentCode = urlParams.get('code') || '';
+    const agentName = urlParams.get('name') || '';
+
+    // 小程序原始ID
+    const MINI_APP_ID = 'wx182b0a111df1bca3';
+    // 页面路径
+    const PAGE_PATH = 'pages/home/index';
+
+    // 显示代理信息
+    if (agentCode) {
+      document.getElementById('agentCode').textContent = agentCode;
+      document.getElementById('agentName').textContent = agentName || '代理用户';
+      document.title = '推荐人 ' + (agentName || agentCode) + ' - 维创AI';
+    } else {
+      document.getElementById('agentCode').textContent = '未指定代理';
+      document.getElementById('agentName').textContent = '访客';
+    }
+
+    // 判断是否在微信环境
+    function isWeChat() {
+      return typeof wx !== 'undefined' || /MicroMessenger/i.test(navigator.userAgent);
+    }
+
+    // 判断是否在手机端
+    function isMobile() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // 生成小程序链接
+    function generateLink() {
+      const base = `weixin://dl/business/?t=${Date.now()}`;
+      return base;
+    }
+
+    // 尝试打开小程序
+    function openMiniProgram() {
+      const btn = document.getElementById('openBtn');
+      const loading = document.getElementById('loading');
+      const tip = document.getElementById('tip');
+
+      btn.style.display = 'none';
+      loading.classList.add('show');
+      tip.textContent = '正在跳转...';
+
+      // 构造带参数的小程序路径
+      const path = agentCode
+        ? `${PAGE_PATH}?agentCode=${encodeURIComponent(agentCode)}`
+        : PAGE_PATH;
+
+      // 使用微信开放标签打开小程序（需要在微信中）
+      if (typeof wx !== 'undefined' && wx.openLaunchWeapp) {
+        // 微信环境
+        wx.openLaunchWeapp({
+          appid: MINI_APP_ID,
+          path: path,
+          fail: function(err) {
+            console.log('openLaunchWeapp fail', err);
+            // 尝试使用 URL scheme
+            tryOpenByUrlScheme(path);
+          }
+        });
+      } else {
+        // 非微信环境或不支持开放标签
+        tryOpenByUrlScheme(path);
+      }
+    }
+
+    // 通过URL Scheme打开小程序
+    function tryOpenByUrlScheme(path) {
+      // 微信小程序 URL Scheme (需要配置)
+      // 格式: weixin://dl/business/?path=pages/home/index%3FagentCode%3DAGXXXXX
+      const encodedPath = encodeURIComponent(path);
+      const urlScheme = `weixin://dl/business/?path=${encodedPath}`;
+
+      // 尝试打开
+      window.location.href = urlScheme;
+
+      // 如果3秒后没反应，提示用户
+      setTimeout(function() {
+        const now = Date.now();
+        if (now - startTime < 3500) {
+          // 没有成功跳转
+          document.getElementById('loading').classList.remove('show');
+          document.getElementById('openBtn').style.display = 'block';
+          document.getElementById('tip').textContent = '请长按识别上方二维码打开';
+        }
+      }, 3000);
+    }
+
+    var startTime = Date.now();
+
+    // 生成二维码（使用微信官方的wxaqrcode接口）
+    function generateQRCode() {
+      const canvas = document.getElementById('qrCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // 构造带参数的小程序码 URL
+      // 实际使用时需要通过云函数生成真正的小程序码
+      // 这里先用简化版链接
+      const link = `wxa://` + (agentCode ? `?agentCode=${encodeURIComponent(agentCode)}` : '');
+
+      // 使用一个简单的二维码生成库（内联简化版）
+      // 注意：实际项目应该使用后端生成真实的小程序码
+      drawQRCode(ctx, link, 160);
+    }
+
+    // 简化的二维码绘制（仅用于演示）
+    // 实际项目应该调用云函数生成真实的小程序码
+    function drawQRCode(ctx, text, size) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, size, size);
+
+      // 绘制一个占位符（实际应该调用后端API生成真实小程序码）
+      ctx.fillStyle = '#16c6af';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('请使用微信扫码', size/2, size/2 - 10);
+      ctx.fillText('或点击上方按钮', size/2, size/2 + 10);
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      generateQRCode();
+    });
+  </script>
+</body>
+</html>
