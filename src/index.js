@@ -17,7 +17,7 @@ const app = express();
 const PORT = 3650;
 
 // 静态文件托管
-const adminPath = path.join(__dirname, '../../server/public/admin');
+const adminPath = path.join(__dirname, '../public/admin');
 app.use('/admin', express.static(adminPath));
 app.use('/assets', express.static(path.join(adminPath, 'assets')));
 
