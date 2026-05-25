@@ -151,8 +151,11 @@ async function uploadResult(base64Data, taskId) {
   return base64Data;
 }
 
-// 分佣
+// 分佣（暂时禁用，因为users表没有agent_id字段）
 async function distributeCommission(openid, cost) {
+  // TODO: 需要在users表添加agent_id字段或建立推荐关系表才能实现分佣
+  // 目前暂时禁用此功能
+  return;
   try {
     const [users] = await db.query('SELECT agent_id FROM users WHERE openid = ?', [openid]);
     if (!users[0]?.agent_id) return;
@@ -164,7 +167,7 @@ async function distributeCommission(openid, cost) {
     if (agents.length === 0) return;
 
     const agent = agents[0];
-    if (agent.openid === openid) return; // 防止自己给自己分佣
+    if (agent.openid === openid) return;
 
     const commission = Math.round(cost * (agent.commission || 30) / 100 * 100) / 100;
     if (commission <= 0) return;
@@ -172,11 +175,6 @@ async function distributeCommission(openid, cost) {
     await db.query(
       'UPDATE agents SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?',
       [commission, commission, agent.id]
-    );
-
-    await db.query(
-      'INSERT INTO agent_incomes (agent_id, type, amount, description, from_openid, status, created_at) VALUES (?, "commission", ?, "推荐用户消费佣金", ?, "settled", NOW())',
-      [agent.id, commission, openid]
     );
   } catch (err) {
     console.error('Distribute commission error:', err);

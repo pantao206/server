@@ -61,41 +61,22 @@ router.post('/', async (req, res) => {
         'UPDATE users SET nickname = ?, avatarUrl = ?, updated_at = NOW() WHERE openid = ?',
         [nickname || user.nickname, avatarUrl || user.avatarUrl, openid]
       );
-      
-      // 如果有新的代理码，更新绑定关系
-      if (agentCode && !user.agent_id) {
-        const [agents] = await db.query('SELECT id FROM agents WHERE code = ? AND status = "active"', [agentCode]);
-        if (agents.length > 0) {
-          await db.query('UPDATE users SET agent_id = ? WHERE openid = ?', [agents[0].id, openid]);
-          await db.query('UPDATE agents SET total_referred = total_referred + 1 WHERE id = ?', [agents[0].id]);
-        }
-      }
-      
+
       return res.json({ code: 0, data: { ...user, nickname: nickname || user.nickname, avatarUrl: avatarUrl || user.avatarUrl } });
     } else {
       // 创建新用户
-      let agentId = null;
-      if (agentCode) {
-        const [agents] = await db.query('SELECT id FROM agents WHERE code = ? AND status = "active"', [agentCode]);
-        if (agents.length > 0) {
-          agentId = agents[0].id;
-          await db.query('UPDATE agents SET total_referred = total_referred + 1 WHERE id = ?', [agentId]);
-        }
-      }
-      
       const [result] = await db.query(
-        'INSERT INTO users (openid, nickname, avatarUrl, agent_id, quota, created_at) VALUES (?, ?, ?, ?, 0, NOW())',
-        [openid, nickname || '微信用户', avatarUrl || '', agentId]
+        'INSERT INTO users (openid, nickname, avatarUrl, quota, created_at) VALUES (?, ?, ?, 0, NOW())',
+        [openid, nickname || '微信用户', avatarUrl || '']
       );
-      
+
       return res.json({
         code: 0,
         data: {
           id: result.insertId,
           openid,
           nickname: nickname || '微信用户',
-          avatar_url: avatarUrl || '',
-          agent_id: agentId,
+          avatarUrl: avatarUrl || '',
           quota: 0
         }
       });

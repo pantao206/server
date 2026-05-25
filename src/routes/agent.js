@@ -115,22 +115,15 @@ router.post('/applyWithdraw', async (req, res) => {
   }
 });
 
-// 获取推荐用户列表
+// 获取推荐用户列表（暂时禁用，因为users表没有agent_id字段）
 router.post('/referrals', async (req, res) => {
   try {
     const openid = req.headers['x-openid'];
-    const { page = 1, pageSize = 20 } = req.body;
-
     const [agents] = await db.query('SELECT id FROM agents WHERE openid = ? AND status = "active"', [openid]);
     if (agents.length === 0) return res.json({ code: -1, message: '非代理用户' });
 
-    const offset = (page - 1) * pageSize;
-    const [users] = await db.query(
-      'SELECT * FROM users WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [agents[0].id, pageSize, offset]
-    );
-
-    res.json({ code: 0, data: users });
+    // TODO: 需要在users表添加agent_id字段或建立推荐关系表才能实现推荐用户列表
+    res.json({ code: 0, data: [], message: '推荐功能暂时禁用' });
   } catch (err) {
     res.json({ code: -1, message: err.message });
   }
