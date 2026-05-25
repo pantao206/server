@@ -1,9 +1,92 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
-const { v4: uuidv4 } = require('uuid');
 
-// 创建AI换发任务
+// ========== 配置 ==========
+const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
+const MAX_RPM = 3000; // 每分钟最多请求数，从 config.max_rpm 读取
+const MAX_PER_SECOND = 40; // 每秒最多发给AI的任务数，防止突发压力
+const RETRY_MAX = 3; // 最大重试次数
+const RETRY_DELAY_BASE = 2000; // 基础重试延迟（毫秒），指数退避
+
+// ========== 状态 ==========
+let isProcessing = 0; // 当前正在处理的任务数
+let lastProcessTime = Date.now();
+let rpmToken = MAX_RPM; // 当前的 RPM token
+let lastRpmReset = Date.now();
+
+// ========== 定时器（每100ms检查一次）==========
+setInterval(async () => {
+  try {
+    if (isProcessing >= maxConcurrent) return;
+
+    const [[task]] = await db.query(
+      'SELECT * FROM usage_records WHERE status = "queued" ORDER BY created_at ASC LIMIT 1'
+    );
+
+    if (!task) return;
+
+    isProcessing++;
+    processTask(task, task.retry_count || 0).catch(err => console.error('Task failed:', err));
+  } catch (err) {
+    console.error('Scheduler error:', err);
+  }
+}, 100);
+
+// ========== 处理任务 ==========
+async function processTask(task, retryCount = 0) {
+  try {
+    // 更新为处理中
+    await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [task.id]);
+
+    // 获取任务详情
+    const [[taskDetail]] = await db.query('SELECT * FROM usage_records WHERE id = ?', [task.id]);
+    if (!taskDetail) {
+      isProcessing--;
+      return;
+    }
+
+    // 下载图片
+    const sourceBase64 = await downloadImage(taskDetail.source_image);
+    const targetBase64 = await downloadImage(taskDetail.target_image);
+
+    // 调用 AI
+    const promptText = taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
+    const result = await callAI(sourceBase64, targetBase64, promptText);
+
+    // 完成
+    await db.query(
+      'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
+      [result, task.id]
+    );
+
+    // 扣除次数
+    await db.query('UPDATE users SET quota = quota - ? WHERE openid = ?', [taskDetail.cost, taskDetail.openid]);
+
+    // 分佣
+    await distributeCommission(taskDetail.openid, taskDetail.cost);
+
+  } catch (err) {
+    console.error('Process task error:', err);
+
+    // 如果是 429 错误且还能重试，放回队列等调度器重试
+    if (err.message.includes('429') && retryCount < RETRY_MAX) {
+      await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
+      isProcessing--;
+      return;
+    }
+
+    // 其他错误或重试次数用完，标记失败
+    await db.query(
+      'UPDATE usage_records SET status = "failed", error = ? WHERE id = ?',
+      [err.message, task.id]
+    );
+  } finally {
+    isProcessing--;
+  }
+}
+
+// ========== 创建任务 ==========
 router.post('/create', async (req, res) => {
   try {
     const openid = req.headers['x-openid'];
@@ -19,12 +102,6 @@ router.post('/create', async (req, res) => {
       return res.json({ code: -1, message: '次数不足，请先购买' });
     }
 
-    // 清理超时的任务
-    await db.query(
-      `UPDATE usage_records SET status = 'failed', error = '处理超时'
-       WHERE status IN ('queued', 'processing') AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
-    );
-
     // 检查进行中任务
     const [processing] = await db.query(
       `SELECT id FROM usage_records WHERE openid = ? AND status IN ('queued', 'processing')`,
@@ -36,68 +113,60 @@ router.post('/create', async (req, res) => {
 
     // 创建任务
     const [result] = await db.query(
-      `INSERT INTO usage_records (openid, type, source_image, target_image, prompt, cost, status, created_at) 
+      `INSERT INTO usage_records (openid, type, source_image, target_image, prompt, cost, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, 'queued', NOW())`,
       [openid, type, sourceImage, targetImage, prompt || '', cost]
     );
 
-    const taskId = result.insertId;
-
-    // 异步处理任务
-    processTask(taskId).catch(err => console.error('Task failed:', err));
-
-    res.json({ code: 0, data: { id: taskId }, message: '任务已创建' });
+    res.json({ code: 0, data: { id: result.insertId }, message: '任务已提交，请稍后查询结果' });
   } catch (err) {
     res.json({ code: -1, message: err.message });
   }
 });
 
-// 处理任务
-async function processTask(taskId) {
+// ========== 查询任务 ==========
+router.post('/detail', async (req, res) => {
   try {
-    // 更新为处理中
-    await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [taskId]);
+    const openid = req.headers['x-openid'];
+    const { id } = req.body;
 
-    // 获取任务
-    const [[task]] = await db.query('SELECT * FROM usage_records WHERE id = ?', [taskId]);
-    if (!task) return;
-
-    // 下载图片转base64
-    const sourceBase64 = await downloadImage(task.source_image);
-    const targetBase64 = await downloadImage(task.target_image);
-
-    // 调用AI
-    const promptText = task.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
-    const result = await callAI(sourceBase64, targetBase64, promptText);
-
-    // 上传结果
-    const resultUrl = await uploadResult(result, taskId);
-
-    // 更新任务为完成
-    await db.query(
-      'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
-      [resultUrl, taskId]
+    const [tasks] = await db.query(
+      'SELECT * FROM usage_records WHERE id = ? AND openid = ?',
+      [id, openid]
     );
 
-    // 扣除次数
-    await db.query('UPDATE users SET quota = quota - ? WHERE openid = ?', [task.cost, task.openid]);
+    if (tasks.length === 0) return res.json({ code: -1, message: '任务不存在' });
 
-    // 分佣给代理
-    await distributeCommission(task.openid, task.cost);
-
+    res.json({ code: 0, data: tasks[0] });
   } catch (err) {
-    console.error('Process task error:', err);
-    await db.query(
-      'UPDATE usage_records SET status = "failed", error = ? WHERE id = ?',
-      [err.message, taskId]
-    );
+    res.json({ code: -1, message: err.message });
   }
-}
+});
 
-// 下载图片转base64
+// ========== 查询记录 ==========
+router.post('/records', async (req, res) => {
+  try {
+    const openid = req.headers['x-openid'];
+    const { page = 1, pageSize = 10 } = req.body;
+    const offset = (page - 1) * pageSize;
+
+    const [list] = await db.query(
+      'SELECT * FROM usage_records WHERE openid = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [openid, pageSize, offset]
+    );
+
+    res.json({ code: 0, data: { list } });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+});
+
+// ========== 辅助函数 ==========
+
+// 下载图片转 base64
 async function downloadImage(url) {
   if (!url) throw new Error('图片地址为空');
-  
+
   const res = await fetch(url);
   const arrayBuffer = await res.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -105,18 +174,15 @@ async function downloadImage(url) {
   return `data:${ext};base64,` + buffer.toString('base64');
 }
 
-// 调用AI
+// 调用 AI
 async function callAI(sourceBase64, targetBase64, prompt) {
-  // 从数据库获取AI配置
   const [[aiConfig]] = await db.query('SELECT api_url, api_key, model, prompt FROM config WHERE type = "ai" LIMIT 1');
   const apiUrl = aiConfig?.api_url || process.env.AI_API_URL || 'https://api.apiyi.com';
   const apiKey = aiConfig?.api_key || process.env.AI_API_KEY;
   const model = aiConfig?.model || process.env.AI_MODEL || 'gemini-2.0-flash';
-  const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
+  const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle';
 
-  if (!apiKey) {
-    throw new Error('AI API密钥未配置');
-  }
+  if (!apiKey) throw new Error('AI API密钥未配置');
 
   const response = await fetch(`${apiUrl}/chat/completions`, {
     method: 'POST',
@@ -137,6 +203,14 @@ async function callAI(sourceBase64, targetBase64, prompt) {
     })
   });
 
+  if (response.status === 429) {
+    throw new Error('429'); // 特殊标记，让调用方处理
+  }
+
+  if (!response.ok) {
+    throw new Error(`API错误: ${response.status}`);
+  }
+
   const data = await response.json();
   if (!data.choices?.[0]?.message?.content) {
     throw new Error('AI返回格式错误');
@@ -144,78 +218,9 @@ async function callAI(sourceBase64, targetBase64, prompt) {
   return data.choices[0].message.content;
 }
 
-// 上传结果
-async function uploadResult(base64Data, taskId) {
-  // 这里简化处理，实际应该上传到云存储
-  // 返回base64数据（实际项目中应该上传到CDN或云存储）
-  return base64Data;
-}
-
-// 分佣（暂时禁用，因为users表没有agent_id字段）
+// 分佣（暂时禁用）
 async function distributeCommission(openid, cost) {
-  // TODO: 需要在users表添加agent_id字段或建立推荐关系表才能实现分佣
-  // 目前暂时禁用此功能
-  return;
-  try {
-    const [users] = await db.query('SELECT agent_id FROM users WHERE openid = ?', [openid]);
-    if (!users[0]?.agent_id) return;
-
-    const [agents] = await db.query(
-      'SELECT * FROM agents WHERE id = ? AND status = "active"',
-      [users[0].agent_id]
-    );
-    if (agents.length === 0) return;
-
-    const agent = agents[0];
-    if (agent.openid === openid) return;
-
-    const commission = Math.round(cost * (agent.commission || 30) / 100 * 100) / 100;
-    if (commission <= 0) return;
-
-    await db.query(
-      'UPDATE agents SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?',
-      [commission, commission, agent.id]
-    );
-  } catch (err) {
-    console.error('Distribute commission error:', err);
-  }
+  return; // 禁用，users表无agent_id字段
 }
-
-// 查询任务详情
-router.post('/detail', async (req, res) => {
-  try {
-    const openid = req.headers['x-openid'];
-    const { id } = req.body;
-
-    const [tasks] = await db.query(
-      'SELECT * FROM usage_records WHERE id = ? AND openid = ?',
-      [id, openid]
-    );
-
-    if (tasks.length === 0) return res.json({ code: -1, message: '任务不存在' });
-
-    res.json({ code: 0, data: tasks[0] });
-  } catch (err) {
-    res.json({ code: -1, message: err.message });
-  }
-});
-
-// 查询使用记录
-router.post('/records', async (req, res) => {
-  try {
-    const openid = req.headers['x-openid'];
-    const { page = 1, pageSize = 10 } = req.body;
-    const offset = (page - 1) * pageSize;
-
-    const [list] = await db.query(
-      'SELECT * FROM usage_records WHERE openid = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [openid, pageSize, offset]
-    );
-
-    res.json({ code: 0, data: { list } });
-  } catch (err) {
-    res.json({ code: -1, message: err.message });
-  }
-});
 
 module.exports = router;
