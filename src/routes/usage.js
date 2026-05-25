@@ -18,7 +18,7 @@ let lastRpmReset = Date.now();
 // ========== 定时器（每100ms检查一次）==========
 setInterval(async () => {
   try {
-    if (isProcessing >= maxConcurrent) return;
+    if (isProcessing >= MAX_CONCURRENT) return;
 
     const [[task]] = await db.query(
       'SELECT * FROM usage_records WHERE status = "queued" ORDER BY created_at ASC LIMIT 1'
