@@ -21,8 +21,8 @@ router.post('/create', async (req, res) => {
 
     // 清理超时的任务
     await db.query(
-      `UPDATE usage_records SET status = 'failed', error = '处理超时' 
-       WHERE status IN ('queued', 'processing') AND updated_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
+      `UPDATE usage_records SET status = 'failed', error = '处理超时'
+       WHERE status IN ('queued', 'processing') AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
     );
 
     // 检查进行中任务
@@ -56,7 +56,7 @@ router.post('/create', async (req, res) => {
 async function processTask(taskId) {
   try {
     // 更新为处理中
-    await db.query('UPDATE usage_records SET status = "processing", updated_at = NOW() WHERE id = ?', [taskId]);
+    await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [taskId]);
 
     // 获取任务
     const [[task]] = await db.query('SELECT * FROM usage_records WHERE id = ?', [taskId]);
@@ -75,7 +75,7 @@ async function processTask(taskId) {
 
     // 更新任务为完成
     await db.query(
-      'UPDATE usage_records SET status = "completed", result_image = ?, updated_at = NOW() WHERE id = ?',
+      'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
       [resultUrl, taskId]
     );
 
@@ -88,7 +88,7 @@ async function processTask(taskId) {
   } catch (err) {
     console.error('Process task error:', err);
     await db.query(
-      'UPDATE usage_records SET status = "failed", error = ?, updated_at = NOW() WHERE id = ?',
+      'UPDATE usage_records SET status = "failed", error = ? WHERE id = ?',
       [err.message, taskId]
     );
   }

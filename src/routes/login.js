@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
       // 更新用户信息
       const user = users[0];
       await db.query(
-        'UPDATE users SET nickname = ?, avatarUrl = ?, updated_at = NOW() WHERE openid = ?',
+        'UPDATE users SET nickname = ?, avatarUrl = ? WHERE openid = ?',
         [nickname || user.nickname, avatarUrl || user.avatarUrl, openid]
       );
 
