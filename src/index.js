@@ -14,7 +14,7 @@ const configRouter = require('./routes/config');
 const uploadRouter = require('./routes/upload');
 
 const app = express();
-const PORT = 3650;
+const PORT = process.env.PORT || 3650;
 
 // 静态文件托管
 const adminPath = path.join(__dirname, '../public/admin');

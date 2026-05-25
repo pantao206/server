@@ -58,8 +58,8 @@ router.post('/', async (req, res) => {
       // 更新用户信息
       const user = users[0];
       await db.query(
-        'UPDATE users SET nickname = ?, avatar_url = ?, updated_at = NOW() WHERE openid = ?',
-        [nickname || user.nickname, avatarUrl || user.avatar_url, openid]
+        'UPDATE users SET nickname = ?, avatarUrl = ?, updated_at = NOW() WHERE openid = ?',
+        [nickname || user.nickname, avatarUrl || user.avatarUrl, openid]
       );
       
       // 如果有新的代理码，更新绑定关系
@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
         }
       }
       
-      return res.json({ code: 0, data: { ...user, nickname: nickname || user.nickname, avatar_url: avatarUrl || user.avatar_url } });
+      return res.json({ code: 0, data: { ...user, nickname: nickname || user.nickname, avatarUrl: avatarUrl || user.avatarUrl } });
     } else {
       // 创建新用户
       let agentId = null;
@@ -84,7 +84,7 @@ router.post('/', async (req, res) => {
       }
       
       const [result] = await db.query(
-        'INSERT INTO users (openid, nickname, avatar_url, agent_id, quota, created_at) VALUES (?, ?, ?, ?, 0, NOW())',
+        'INSERT INTO users (openid, nickname, avatarUrl, agent_id, quota, created_at) VALUES (?, ?, ?, ?, 0, NOW())',
         [openid, nickname || '微信用户', avatarUrl || '', agentId]
       );
       
