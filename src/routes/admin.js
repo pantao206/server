@@ -250,9 +250,17 @@ async function getApiConfig(res, d) {
 }
 
 async function updateApiConfig(res, d) {
+  console.log('[updateApiConfig] 接收到的参数:', JSON.stringify(d));
   const { type = 'ai', api_url = '', api_key = '', model = '', prompt = '' } = d;
-  await db.query(`INSERT INTO config (type, api_url, api_key, model, prompt, updated_at) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE api_url = ?, api_key = ?, model = ?, prompt = ?, updated_at = NOW()`, [type, api_url, api_key, model, prompt, api_url, api_key, model, prompt]);
-  res.json({ code: 0, message: '保存成功' });
+  console.log('[updateApiConfig] 解析后的值:', { type, api_url, model, prompt });
+  try {
+    await db.query(`INSERT INTO config (type, api_url, api_key, model, prompt, updated_at) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE api_url = ?, api_key = ?, model = ?, prompt = ?, updated_at = NOW()`, [type, api_url, api_key, model, prompt, api_url, api_key, model, prompt]);
+    console.log('[updateApiConfig] SQL执行成功');
+    res.json({ code: 0, message: '保存成功' });
+  } catch (err) {
+    console.error('[updateApiConfig] SQL执行失败:', err.message);
+    res.json({ code: -1, message: err.message });
+  }
 }
 
 module.exports = router;
