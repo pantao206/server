@@ -1162,8 +1162,9 @@ async function saveApiConfig(type) {
   }
   try {
     await callAdmin('apiConfigUpdate', {
-      type: 'api_tryon',
+      type: 'ai',
       api_url: document.getElementById('cfgTryonApiUrl').value.trim(),
+      api_key: document.getElementById('cfgTryonApiKey').value.trim(),
       model: document.getElementById('cfgTryonModel').value.trim(),
       prompt: document.getElementById('cfgTryonPrompt').value.trim()
     });
