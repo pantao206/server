@@ -184,38 +184,68 @@ async function callAI(sourceBase64, targetBase64, prompt) {
 
   if (!apiKey) throw new Error('AI API密钥未配置');
 
-  const response = await fetch(`${apiUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: promptText },
-          { type: 'image_url', image_url: { url: sourceBase64 } },
-          { type: 'image_url', image_url: { url: targetBase64 } }
-        ]
-      }]
-    })
-  });
+  // 设置120秒超时
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
 
-  if (response.status === 429) {
-    throw new Error('429'); // 特殊标记，让调用方处理
-  }
+  try {
+    const response = await fetch(`${apiUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: promptText },
+            { type: 'image_url', image_url: { url: sourceBase64 } },
+            { type: 'image_url', image_url: { url: targetBase64 } }
+          ]
+        }]
+      }),
+      signal: controller.signal
+    });
 
-  if (!response.ok) {
-    throw new Error(`API错误: ${response.status}`);
-  }
+    clearTimeout(timeout);
 
-  const data = await response.json();
-  if (!data.choices?.[0]?.message?.content) {
-    throw new Error('AI返回格式错误');
+    if (response.status === 429) {
+      throw new Error('429');
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API错误 ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    console.log('[callAI] AI响应:', JSON.stringify(data).substring(0, 200));
+
+    // 检查不同返回格式
+    let result = data.choices?.[0]?.message?.content;
+    if (!result && data.result) {
+      result = data.result;
+    }
+    if (!result && data.output) {
+      result = data.output;
+    }
+    if (!result && data.text) {
+      result = data.text;
+    }
+
+    if (!result) {
+      throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
+    }
+    return result;
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      throw new Error('AI请求超时(120秒)');
+    }
+    throw err;
   }
-  return data.choices[0].message.content;
 }
 
 // 分佣（暂时禁用）
