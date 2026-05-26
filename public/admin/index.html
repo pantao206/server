@@ -700,12 +700,12 @@ function renderUsageTable(list) {
     const statusMap = { queued:['排队中','default'], pending:['待处理','warning'], processing:['处理中','info'], completed:['已完成','success'], failed:['已失败','danger'] };
     const [label, cls] = statusMap[r.status] || [r.status, 'default'];
     return `<tr>
-      <td title="${r._id}">${r._id.substring(0, 10)}...</td>
+      <td>${r.id}</td>
       <td title="${r.openid}">${(r.openid || '').substring(0, 8)}...</td>
       <td>${r.type === 'tryon' ? '换发' : r.type === 'avatar' ? '头像' : r.type}</td>
       <td>${r.cost || 0}次</td>
       <td><span class="badge badge-${cls}">${label}</span></td>
-      <td>${formatDate(r.createdAt)}</td>
+      <td>${formatDate(r.created_at)}</td>
     </tr>`;
   }).join('');
 }
