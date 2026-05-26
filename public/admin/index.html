@@ -385,11 +385,7 @@
         <div class="config-grid">
           <!-- 价格 & 全局配置 -->
           <div class="config-section">
-            <h3>💰 价格 & 全局配置</h3>
-            <div class="form-group">
-              <label>AI换发价格 (次/元)</label>
-              <input type="number" id="cfgPriceNormal" min="0" step="0.1">
-            </div>
+            <h3>💰 全局配置</h3>
             <div class="form-group">
               <label>全局最大并发数</label>
               <input type="number" id="cfgMaxConcurrent" min="1" max="200" placeholder="100">
@@ -1134,7 +1130,6 @@ async function loadConfig() {
 
     // 价格 & 全局配置
     const cfg = cfgRes.data;
-    document.getElementById('cfgPriceNormal').value = cfg.price_normal || '';
     document.getElementById('cfgMaxConcurrent').value = cfg.max_concurrent || 100;
     document.getElementById('cfgWelcome').value = cfg.welcome_text || '';
 
@@ -1149,11 +1144,10 @@ async function loadConfig() {
 async function saveConfig() {
   try {
     await callAdmin('configUpdate', {
-      price_normal: Number(document.getElementById('cfgPriceNormal').value) || 0,
       welcome_text: document.getElementById('cfgWelcome').value,
       max_concurrent: Number(document.getElementById('cfgMaxConcurrent').value) || 100
     });
-    showToast('价格配置已保存');
+    showToast('配置已保存');
   } catch (err) { showToast('保存失败', 'error'); }
 }
 

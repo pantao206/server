@@ -264,8 +264,8 @@ async function getConfig(res) {
 }
 
 async function updateConfig(res, d) {
-  const { price_normal = 1, price_avatar = 2, price_hd = 2, max_concurrent = 100, welcome_text = '' } = d;
-  await db.query(`INSERT INTO config (type, price_normal, price_avatar, price_hd, max_concurrent, welcome_text, updated_at) VALUES ("public", ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE price_normal = ?, price_avatar = ?, price_hd = ?, max_concurrent = ?, welcome_text = ?, updated_at = NOW()`, [price_normal, price_avatar, price_hd, max_concurrent, welcome_text, price_normal, price_avatar, price_hd, max_concurrent, welcome_text]);
+  const { max_concurrent = 100, welcome_text = '' } = d;
+  await db.query(`INSERT INTO config (type, max_concurrent, welcome_text, updated_at) VALUES ("public", ?, ?, NOW()) ON DUPLICATE KEY UPDATE max_concurrent = ?, welcome_text = ?, updated_at = NOW()`, [max_concurrent, welcome_text, max_concurrent, welcome_text]);
   res.json({ code: 0, message: '保存成功' });
 }
 
