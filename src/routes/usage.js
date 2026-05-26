@@ -175,6 +175,35 @@ router.post('/records', async (req, res) => {
   }
 });
 
+// ========== 删除记录 ==========
+router.post('/delete', async (req, res) => {
+  try {
+    const openid = req.headers['x-openid'];
+    const { id } = req.body;
+
+    // 获取记录，验证权限
+    const [[record]] = await db.query('SELECT * FROM usage_records WHERE id = ? AND openid = ?', [id, openid]);
+    if (!record) return res.json({ code: -1, message: '记录不存在' });
+
+    // 删除COS图片
+    if (record.result_image && record.result_image.startsWith('http')) {
+      try {
+        const urlObj = new URL(record.result_image);
+        const key = urlObj.pathname.substring(1);
+        await deleteFile(key);
+      } catch (err) {
+        console.error('[deleteUsage] 删除COS文件失败:', err.message);
+      }
+    }
+
+    // 删除数据库记录
+    await db.query('DELETE FROM usage_records WHERE id = ?', [id]);
+    res.json({ code: 0, message: '删除成功' });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+});
+
 // ========== 辅助函数 ==========
 
 // 下载图片转 base64

@@ -35,6 +35,7 @@ router.post('/', async (req, res) => {
       case 'orderList': return loadOrderList(res, d);
       case 'orderUpdate': return updateOrder(res, d);
       case 'usageList': return loadUsageList(res, d);
+      case 'usageDelete': return deleteUsageRecord(res, d);
       case 'categoryList': return loadCategoryList(res);
       case 'categoryCreate': return createCategory(res, d);
       case 'categoryUpdate': return updateCategory(res, d);
@@ -117,6 +118,27 @@ async function loadUsageList(res, d) {
   const [list] = await db.query(`SELECT * FROM usage_records WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
   const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM usage_records WHERE ${where}`, params);
   res.json({ code: 0, data: { list, total } });
+}
+
+async function deleteUsageRecord(res, d) {
+  const { id } = d;
+  if (!id) return res.json({ code: -1, message: '缺少id参数' });
+
+  // 获取记录，删除COS图片
+  const [[record]] = await db.query('SELECT result_image FROM usage_records WHERE id = ?', [id]);
+  if (record && record.result_image && record.result_image.startsWith('http')) {
+    try {
+      const urlObj = new URL(record.result_image);
+      const key = urlObj.pathname.substring(1);
+      const { deleteFile } = require('../utils/cos');
+      await deleteFile(key);
+    } catch (err) {
+      console.error('[deleteUsageRecord] 删除COS文件失败:', err.message);
+    }
+  }
+
+  await db.query('DELETE FROM usage_records WHERE id = ?', [id]);
+  res.json({ code: 0, message: '删除成功' });
 }
 
 async function loadCategoryList(res) {
