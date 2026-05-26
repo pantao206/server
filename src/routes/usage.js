@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
+const { uploadBase64Image } = require('../utils/cos');
 
 // ========== 配置 ==========
 const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
@@ -59,10 +60,16 @@ async function processTask(task, retryCount = 0) {
     const result = await callAI(sourceBase64, targetBase64, promptText);
     console.log('[processTask] AI调用成功, result length:', result?.length);
 
+    // 上传结果图片到COS
+    console.log('[processTask] 开始上传结果图片到COS...');
+    const cosKey = `results/${task.id}_${Date.now()}.jpg`;
+    const resultUrl = await uploadBase64Image(result, cosKey);
+    console.log('[processTask] 上传成功, URL:', resultUrl);
+
     // 完成
     await db.query(
       'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
-      [result, task.id]
+      [resultUrl, task.id]
     );
     console.log('[processTask] 任务完成, id:', task.id);
 
