@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
-const { getMonitorData, updateTaskStats } = require('../utils/monitor');
+const { getMonitorData, updateTaskStats, getTryonTasksData, setTryonStoragePath, getTryonStoragePath } = require('../utils/monitor');
 
 // 统一入口
 router.post('/', async (req, res) => {
@@ -56,6 +56,8 @@ router.post('/', async (req, res) => {
       case 'apiConfigGet': return getApiConfig(res, d);
       case 'apiConfigUpdate': return updateApiConfig(res, d);
       case 'monitor': return getMonitor(req, res);
+      case 'tryonList': return getTryonList(res, d);
+      case 'setStoragePath': return setStoragePath(res, d);
       default: return res.json({ code: -1, message: '未知action' });
     }
   } catch (err) {
@@ -311,6 +313,27 @@ async function getMonitor(req, res) {
     data.taskStats = taskStats;
 
     res.json({ code: 0, data });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+}
+
+async function getTryonList(res, d) {
+  try {
+    const { page = 1, pageSize = 30 } = d || {};
+    const data = getTryonTasksData(page, pageSize);
+    res.json({ code: 0, data });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+}
+
+async function setStoragePath(res, d) {
+  try {
+    const { path: p } = d || {};
+    if (!p) return res.json({ code: -1, message: '请提供路径' });
+    setTryonStoragePath(p);
+    res.json({ code: 0, message: '存储路径已设置' });
   } catch (err) {
     res.json({ code: -1, message: err.message });
   }

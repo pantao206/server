@@ -109,6 +109,33 @@
     .log-error { color: #f85149; }
     .log-taskid { color: #a371f7; min-width: 50px; }
     .log-openid { color: #8b949e; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 换发任务追踪表格 */
+    .tryon-section { margin-top: 20px; }
+    .tryon-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .tryon-title { font-size: 16px; font-weight: 600; color: var(--text); }
+    .storage设置 { display: flex; align-items: center; gap: 8px; }
+    .storage设置 input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; color: var(--text); width: 300px; font-size: 13px; }
+    .storage设置 button { background: var(--primary); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .tryon-table { width: 100%; border-collapse: collapse; }
+    .tryon-table th { background: var(--card); padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-light); border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+    .tryon-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .tryon-table tr:hover { background: var(--bg); }
+    .tryon-table .task-id { color: var(--primary); font-family: monospace; }
+    .tryon-table .openid { color: var(--text-light); font-family: monospace; font-size: 12px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tryon-table .duration { font-family: monospace; color: var(--text); }
+    .tryon-table .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .status-queued { background: rgba(243, 156, 18, 0.2); color: var(--warning); }
+    .status-processing { background: rgba(22, 198, 175, 0.2); color: var(--primary); }
+    .status-ai_processing { background: rgba(22, 198, 175, 0.3); color: #1abc9c; }
+    .status-completed { background: rgba(39, 174, 96, 0.2); color: var(--success); }
+    .status-failed { background: rgba(231, 76, 60, 0.2); color: var(--danger); }
+    .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .pagination-info { font-size: 12px; color: var(--text-light); }
+    .pagination buttons { display: flex; gap: 8px; }
+    .pagination button { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .pagination button:hover { background: var(--border); }
+    .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -284,6 +311,42 @@
         </div>
       </div>
     </div>
+
+    <!-- 换发任务追踪 -->
+    <div class="section tryon-section">
+      <div class="section-header">
+        <span>📋 换发任务追踪</span>
+        <div class="storage设置">
+          <input type="text" id="storagePath" placeholder="选择本地文件夹路径保存日志">
+          <button onclick="setStoragePath()">保存路径</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding: 0; max-height: 500px; overflow-y: auto;">
+        <table class="tryon-table">
+          <thead>
+            <tr>
+              <th>任务ID</th>
+              <th>用户ID</th>
+              <th>排队时长</th>
+              <th>处理时长</th>
+              <th>AI处理</th>
+              <th>总时长</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="tryonTableBody">
+            <tr><td colspan="7" class="no-data">暂无任务数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span class="pagination-info" id="tryonPaginationInfo">共 0 条</span>
+        <div class="pagination buttons">
+          <button id="tryonPrevBtn" onclick="tryonChangePage(-1)" disabled>上一页</button>
+          <button id="tryonNextBtn" onclick="tryonChangePage(1)" disabled>下一页</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -443,8 +506,106 @@
         } else {
           taskTerminal.innerHTML = '<div class="no-data">等待任务...</div>';
         }
+
+        // 更新换发任务追踪表格
+        if (d.tryonTasks) {
+          updateTryonTable(d.tryonTasks);
+        }
+        if (d.tryonStoragePath) {
+          document.getElementById('storagePath').value = d.tryonStoragePath;
+        }
       } catch (err) {
         console.error('加载监控数据失败:', err);
+      }
+    }
+
+    let currentTryonPage = 1;
+    let tryonTimer = null;
+
+    function updateTryonTable(data) {
+      const tbody = document.getElementById('tryonTableBody');
+      const { list, total, page, totalPages } = data;
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">暂无任务数据</td></tr>';
+        document.getElementById('tryonPaginationInfo').textContent = '共 0 条';
+        return;
+      }
+
+      currentTryonPage = page;
+      let html = '';
+      list.forEach(task => {
+        const statusMap = {
+          'queued': '排队中',
+          'processing': '处理中',
+          'ai_processing': 'AI处理中',
+          'completed': '成功',
+          'failed': '失败'
+        };
+        const statusText = statusMap[task.status] || task.status;
+        const statusClass = 'status-' + task.status;
+
+        html += `
+          <tr>
+            <td class="task-id">${task.id}</td>
+            <td class="openid" title="${task.openid}">${task.openid.substring(0, 10)}...</td>
+            <td class="duration">${task.queueDuration || '-'}</td>
+            <td class="duration">${task.processDuration || '-'}</td>
+            <td class="duration">${task.aiDuration || '-'}</td>
+            <td class="duration">${task.totalDuration || '-'}</td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+
+      // 更新分页
+      document.getElementById('tryonPaginationInfo').textContent = `共 ${total} 条，第 ${page}/${totalPages} 页`;
+      document.getElementById('tryonPrevBtn').disabled = page <= 1;
+      document.getElementById('tryonNextBtn').disabled = page >= totalPages;
+    }
+
+    async function tryonChangePage(delta) {
+      const newPage = currentTryonPage + delta;
+      if (newPage < 1) return;
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'tryonList', data: { page: newPage, pageSize: 30 }, adminToken })
+        });
+        const json = await res.json();
+        if (json.code === 0) {
+          updateTryonTable(json.data);
+        }
+      } catch (err) {
+        console.error('获取换发任务列表失败:', err);
+      }
+    }
+
+    async function setStoragePath() {
+      const path = document.getElementById('storagePath').value.trim();
+      if (!path) {
+        alert('请输入存储路径');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setStoragePath', data: { path }, adminToken })
+        });
+        const json = await res.json();
+        if (json.code === 0) {
+          alert('存储路径已设置');
+        } else {
+          alert('设置失败: ' + json.message);
+        }
+      } catch (err) {
+        console.error('设置存储路径失败:', err);
+        alert('设置失败');
       }
     }
 
@@ -457,8 +618,8 @@
         return;
       }
       loadData();
-      // 每5秒自动刷新
-      setInterval(loadData, 5000);
+      // 每2秒自动刷新（任务追踪需要更频繁）
+      setInterval(loadData, 2000);
     });
   </script>
 </body>

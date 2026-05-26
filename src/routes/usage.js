@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
 const { uploadBase64Image, deleteFile } = require('../utils/cos');
-const { logTaskEvent } = require('../utils/monitor');
+const { logTaskEvent, initTryonTask, updateTryonTaskStatus, setTryonTaskError } = require('../utils/monitor');
 
 // ========== 配置 ==========
 const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
@@ -40,6 +40,7 @@ async function processTask(task, retryCount = 0) {
   try {
     // 更新为处理中
     await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [task.id]);
+    updateTryonTaskStatus(task.id, 'processing');
     logTaskEvent(task.id, task.openid, `调度器取出任务，开始处理`, 'info');
 
     // 获取任务详情
@@ -62,6 +63,7 @@ async function processTask(task, retryCount = 0) {
     logTaskEvent(task.id, task.openid, `目标图片下载完成，大小: ${(targetBase64.length/1024).toFixed(1)}KB`, 'info');
 
     // 调用 AI
+    updateTryonTaskStatus(task.id, 'ai_processing');
     const promptText = taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
     logTaskEvent(task.id, task.openid, `开始调用AI接口...`, 'info');
     const result = await callAI(sourceBase64, targetBase64, promptText);
@@ -78,6 +80,7 @@ async function processTask(task, retryCount = 0) {
       'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
       [resultUrl, task.id]
     );
+    updateTryonTaskStatus(task.id, 'completed');
     logTaskEvent(task.id, task.openid, `任务完成！`, 'success');
 
     // 扣除次数
@@ -88,6 +91,7 @@ async function processTask(task, retryCount = 0) {
 
   } catch (err) {
     logTaskEvent(task.id, task.openid, `任务失败: ${err.message}`, 'error');
+    setTryonTaskError(task.id, err.message);
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
@@ -141,6 +145,7 @@ router.post('/create', async (req, res) => {
       [openid, type, sourceImage, targetImage, prompt || '', cost]
     );
 
+    initTryonTask(result.insertId, openid);
     logTaskEvent(result.insertId, openid, `任务已创建，等待调度器处理`, 'info');
     res.json({ code: 0, data: { id: result.insertId }, message: '任务已提交，请稍后查询结果' });
   } catch (err) {
