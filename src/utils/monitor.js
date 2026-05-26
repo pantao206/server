@@ -57,6 +57,8 @@ function recordRequest(path, status, duration, isError = false) {
   // API调用次数统计
   if (monitorData.apiCalls[path] !== undefined) {
     monitorData.apiCalls[path]++;
+  } else {
+    monitorData.apiCalls[path] = 1;
   }
 }
 

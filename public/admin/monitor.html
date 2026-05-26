@@ -53,26 +53,6 @@
     .progress-bar .fill.danger { background: var(--danger); }
     .progress-bar .fill.warning { background: var(--warning); }
 
-    /* API调用排行 */
-    .api-list { display: flex; flex-direction: column; gap: 10px; }
-    .api-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
-    .api-item .path { flex: 1; font-size: 13px; font-family: monospace; color: var(--primary); }
-    .api-item .count { font-size: 14px; font-weight: 600; color: var(--text); min-width: 60px; text-align: right; }
-    .api-item .bar { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-    .api-item .bar .fill { height: 100%; background: var(--primary); border-radius: 3px; }
-
-    /* 实时请求 */
-    .request-table { width: 100%; }
-    .request-table th, .request-table td { padding: 10px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
-    .request-table th { color: var(--text-light); font-weight: 500; }
-    .request-table tr:hover { background: var(--bg); }
-    .request-table .path { font-family: monospace; color: var(--primary); }
-    .request-table .status { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    .status-2xx { background: rgba(39, 174, 96, 0.2); color: var(--success); }
-    .status-4xx { background: rgba(243, 156, 18, 0.2); color: var(--warning); }
-    .status-5xx { background: rgba(231, 76, 60, 0.2); color: var(--danger); }
-    .time { color: var(--text-light); font-size: 12px; }
-
     /* 任务状态 */
     .task-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .task-card { background: var(--bg); border-radius: 8px; padding: 16px; text-align: center; }
@@ -231,41 +211,6 @@
             <div class="label">失败</div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- API调用统计 -->
-    <div class="section">
-      <div class="section-header">
-        <span>📈 API 调用统计</span>
-      </div>
-      <div class="section-body">
-        <div class="api-list" id="apiList">
-          <div class="no-data">加载中...</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 实时请求日志 -->
-    <div class="section">
-      <div class="section-header">
-        <span>📝 实时请求日志</span>
-        <span style="font-size: 12px; color: var(--text-light);">最近 20 条</span>
-      </div>
-      <div class="section-body">
-        <table class="request-table">
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>路径</th>
-              <th>状态</th>
-              <th>耗时</th>
-            </tr>
-          </thead>
-          <tbody id="requestLog">
-            <tr><td colspan="4" class="no-data">加载中...</td></tr>
-          </tbody>
-        </table>
       </div>
     </div>
 
@@ -430,42 +375,6 @@
         document.getElementById('taskProcessing').textContent = d.taskStats.processing || 0;
         document.getElementById('taskCompleted').textContent = d.taskStats.completed || 0;
         document.getElementById('taskFailed').textContent = d.taskStats.failed || 0;
-
-        // 更新API调用统计
-        const apiList = document.getElementById('apiList');
-        const apiCalls = d.apiCalls;
-        const maxCount = Math.max(...Object.values(apiCalls), 1);
-        let html = '';
-        for (const [path, count] of Object.entries(apiCalls)) {
-          const percent = (count / maxCount * 100).toFixed(0);
-          html += `
-            <div class="api-item">
-              <span class="path">${path}</span>
-              <span class="count">${count}</span>
-              <div class="bar"><div class="fill" style="width: ${percent}%"></div></div>
-            </div>
-          `;
-        }
-        apiList.innerHTML = html || '<div class="no-data">暂无数据</div>';
-
-        // 更新请求日志
-        const tbody = document.getElementById('requestLog');
-        if (d.requests.recent && d.requests.recent.length > 0) {
-          let html = '';
-          d.requests.recent.reverse().forEach(r => {
-            html += `
-              <tr>
-                <td class="time">${formatTime(r.time)}</td>
-                <td class="path">${r.path}</td>
-                <td><span class="status ${getStatusClass(r.status)}">${r.status}</span></td>
-                <td>${r.duration}ms</td>
-              </tr>
-            `;
-          });
-          tbody.innerHTML = html;
-        } else {
-          tbody.innerHTML = '<tr><td colspan="4" class="no-data">暂无请求</td></tr>';
-        }
 
         // 更新错误日志
         const errorTbody = document.getElementById('errorLog');
