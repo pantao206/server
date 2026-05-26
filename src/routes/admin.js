@@ -250,13 +250,20 @@ async function getApiConfig(res, d) {
 }
 
 async function updateApiConfig(res, d) {
-  const { type = 'ai', api_url = '', api_key = '', model = '', prompt = '' } = d;
+  const { type = 'ai', api_url = '', model = '', prompt = '' } = d;
   try {
-    // 只更新 api_url, model, prompt（api_key 从 .env 读取）
-    await db.query(`INSERT INTO config (type, api_url, api_key, model, prompt, updated_at)
-      VALUES (?, ?, '', ?, ?, NOW())
-      ON DUPLICATE KEY UPDATE api_url = VALUES(api_url), model = VALUES(model), prompt = VALUES(prompt), updated_at = NOW()`,
-      [type, api_url, model, prompt]);
+    // 直接用 UPDATE，因为 type='ai' 的记录已经存在
+    const [result] = await db.query(
+      `UPDATE config SET api_url = ?, model = ?, prompt = ?, updated_at = NOW() WHERE type = ?`,
+      [api_url, model, prompt, type]
+    );
+    // 如果没有匹配到记录，则插入
+    if (result.affectedRows === 0) {
+      await db.query(
+        `INSERT INTO config (type, api_url, api_key, model, prompt, created_at, updated_at) VALUES (?, ?, '', ?, ?, NOW(), NOW())`,
+        [type, api_url, model, prompt]
+      );
+    }
     res.json({ code: 0, message: '保存成功' });
   } catch (err) {
     console.error('[updateApiConfig] SQL执行失败:', err.message);
