@@ -176,9 +176,9 @@ async function downloadImage(url) {
 
 // 调用 AI
 async function callAI(sourceBase64, targetBase64, prompt) {
-  const [[aiConfig]] = await db.query('SELECT api_url, api_key, model, prompt FROM config WHERE type = "ai" LIMIT 1');
+  const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
   const apiUrl = aiConfig?.api_url || process.env.AI_API_URL || 'https://api.apiyi.com';
-  const apiKey = aiConfig?.api_key || process.env.AI_API_KEY;
+  const apiKey = process.env.AI_API_KEY;  // api_key 直接从 .env 读取
   const model = aiConfig?.model || process.env.AI_MODEL || 'gemini-2.0-flash';
   const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle';
 
