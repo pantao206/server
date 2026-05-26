@@ -1161,15 +1161,25 @@ async function saveApiConfig(type) {
     return;
   }
   try {
-    await callAdmin('apiConfigUpdate', {
+    console.log('[saveApiConfig] 开始保存，参数:', {
+      type: 'ai',
+      api_url: document.getElementById('cfgTryonApiUrl').value.trim(),
+      model: document.getElementById('cfgTryonModel').value.trim(),
+      prompt: document.getElementById('cfgTryonPrompt').value.trim()
+    });
+    const result = await callAdmin('apiConfigUpdate', {
       type: 'ai',
       api_url: document.getElementById('cfgTryonApiUrl').value.trim(),
       api_key: document.getElementById('cfgTryonApiKey').value.trim(),
       model: document.getElementById('cfgTryonModel').value.trim(),
       prompt: document.getElementById('cfgTryonPrompt').value.trim()
     });
+    console.log('[saveApiConfig] 保存成功:', result);
     showToast('AI换发配置已保存');
-  } catch (err) { showToast('保存失败', 'error'); }
+  } catch (err) {
+    console.error('[saveApiConfig] 保存失败:', err);
+    showToast('保存失败: ' + (err.message || err), 'error');
+  }
 }
 
 // ===== 通用：分页渲染 =====
