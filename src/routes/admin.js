@@ -250,12 +250,13 @@ async function getApiConfig(res, d) {
 }
 
 async function updateApiConfig(res, d) {
-  console.log('[updateApiConfig] 接收到的参数:', JSON.stringify(d));
   const { type = 'ai', api_url = '', api_key = '', model = '', prompt = '' } = d;
-  console.log('[updateApiConfig] 解析后的值:', { type, api_url, model, prompt });
   try {
-    await db.query(`INSERT INTO config (type, api_url, api_key, model, prompt, updated_at) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE api_url = ?, api_key = ?, model = ?, prompt = ?, updated_at = NOW()`, [type, api_url, api_key, model, prompt, api_url, api_key, model, prompt]);
-    console.log('[updateApiConfig] SQL执行成功');
+    // 只更新 api_url, model, prompt（api_key 从 .env 读取）
+    await db.query(`INSERT INTO config (type, api_url, api_key, model, prompt, updated_at)
+      VALUES (?, ?, '', ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE api_url = VALUES(api_url), model = VALUES(model), prompt = VALUES(prompt), updated_at = NOW()`,
+      [type, api_url, model, prompt]);
     res.json({ code: 0, message: '保存成功' });
   } catch (err) {
     console.error('[updateApiConfig] SQL执行失败:', err.message);

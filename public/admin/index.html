@@ -1126,7 +1126,7 @@ async function loadConfig() {
   try {
     const [cfgRes, tryonRes] = await Promise.all([
       callAdmin('configGet'),
-      callAdmin('apiConfigGet', { type: 'api_tryon' })
+      callAdmin('apiConfigGet', { type: 'ai' })
     ]);
 
     // 价格 & 全局配置
