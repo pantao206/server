@@ -125,6 +125,11 @@
         <div class="value" id="uptime">-</div>
         <div class="sub" id="startTime">-</div>
       </div>
+      <div class="stat-card">
+        <div class="label">总错误数</div>
+        <div class="value danger" id="totalErrors">-</div>
+        <div class="sub">启动至今</div>
+      </div>
     </div>
 
     <!-- 系统信息 -->
@@ -215,6 +220,28 @@
         </table>
       </div>
     </div>
+
+    <!-- 错误日志 -->
+    <div class="section">
+      <div class="section-header">
+        <span>⚠️ 错误日志</span>
+        <span style="font-size: 12px; color: var(--text-light);">最近 20 条</span>
+      </div>
+      <div class="section-body">
+        <table class="request-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>路径</th>
+              <th>错误信息</th>
+            </tr>
+          </thead>
+          <tbody id="errorLog">
+            <tr><td colspan="3" class="no-data">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -273,6 +300,7 @@
         document.getElementById('errorRate').textContent = d.requests.errorRate + '%';
         document.getElementById('uptime').textContent = formatUptime(d.uptime);
         document.getElementById('startTime').textContent = new Date(Date.now() - d.uptime * 1000).toLocaleString('zh-CN');
+        document.getElementById('totalErrors').textContent = d.errorCount || 0;
 
         // 更新系统信息
         document.getElementById('cpuUsage').textContent = d.cpu.usage + '%';
@@ -332,6 +360,24 @@
           tbody.innerHTML = html;
         } else {
           tbody.innerHTML = '<tr><td colspan="4" class="no-data">暂无请求</td></tr>';
+        }
+
+        // 更新错误日志
+        const errorTbody = document.getElementById('errorLog');
+        if (d.errors && d.errors.length > 0) {
+          let html = '';
+          d.errors.forEach(e => {
+            html += `
+              <tr>
+                <td class="time">${formatTime(e.time)}</td>
+                <td class="path">${e.path || '-'}</td>
+                <td style="color: var(--danger); font-size: 12px;">${e.message}</td>
+              </tr>
+            `;
+          });
+          errorTbody.innerHTML = html;
+        } else {
+          errorTbody.innerHTML = '<tr><td colspan="3" class="no-data">暂无错误</td></tr>';
         }
       } catch (err) {
         console.error('加载监控数据失败:', err);

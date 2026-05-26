@@ -12,7 +12,7 @@ const orderRouter = require('./routes/order');
 const adminRouter = require('./routes/admin');
 const configRouter = require('./routes/config');
 const uploadRouter = require('./routes/upload');
-const { recordRequest } = require('./utils/monitor');
+const { recordRequest, logError } = require('./utils/monitor');
 
 const app = express();
 const PORT = process.env.PORT || 3650;
@@ -59,7 +59,8 @@ app.use((req, res) => {
 
 // 错误处理
 app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
+  logError(err.message, err.stack, req.path);
+  console.error('[Error]', req.path, err.message);
   res.status(500).json({ code: -1, message: '服务器错误: ' + err.message });
 });
 

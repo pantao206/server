@@ -3,6 +3,7 @@ const os = require('os');
 // ========== 监控数据 ==========
 const monitorData = {
   requests: [],      // 最近请求记录
+  errors: [],        // 错误日志
   totalRequests: 0,
   errorCount: 0,
   startTime: Date.now(),
@@ -22,6 +23,7 @@ const monitorData = {
 
 // 最大保留请求记录数
 const MAX_REQUESTS = 500;
+const MAX_ERRORS = 100;
 const MAX_API_CALLS = 100;
 
 // 记录请求
@@ -53,6 +55,22 @@ function recordRequest(path, status, duration, isError = false) {
 // 更新任务状态统计
 function updateTaskStats(stats) {
   monitorData.taskStats = stats;
+}
+
+// 记录错误
+function logError(message, stack, path = '') {
+  monitorData.errors.push({
+    message,
+    stack,
+    path,
+    time: new Date().toISOString()
+  });
+  monitorData.errorCount++;
+
+  // 超过最大条数，移除最早的
+  if (monitorData.errors.length > MAX_ERRORS) {
+    monitorData.errors.shift();
+  }
 }
 
 // 获取监控数据
@@ -98,6 +116,8 @@ function getMonitorData() {
       qps,
       errorRate
     },
+    errors: monitorData.errors.slice(-20).reverse(),  // 最近20条错误，倒序
+    errorCount: monitorData.errorCount,
     apiCalls: monitorData.apiCalls,
     taskStats: monitorData.taskStats
   };
@@ -105,6 +125,7 @@ function getMonitorData() {
 
 module.exports = {
   recordRequest,
+  logError,
   updateTaskStats,
   getMonitorData
 };
