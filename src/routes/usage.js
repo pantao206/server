@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
-const { uploadBase64Image } = require('../utils/cos');
+const { uploadBase64Image, deleteFile } = require('../utils/cos');
 
 // ========== 配置 ==========
 const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
@@ -290,5 +290,46 @@ async function callAI(sourceBase64, targetBase64, prompt) {
 async function distributeCommission(openid, cost) {
   return; // 禁用，users表无agent_id字段
 }
+
+// ========== 清理7天前的换发记录和COS图片 ==========
+async function cleanupOldRecords() {
+  try {
+    // 查找7天前的已完成/失败记录
+    const [oldRecords] = await db.query(
+      "SELECT id, result_image FROM usage_records WHERE status IN ('completed', 'failed') AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    );
+
+    if (oldRecords.length === 0) {
+      console.log('[cleanup] 没有需要清理的记录');
+      return;
+    }
+
+    console.log('[cleanup] 发现', oldRecords.length, '条过期记录需要清理');
+
+    for (const record of oldRecords) {
+      // 删除COS图片
+      if (record.result_image && record.result_image.startsWith('http')) {
+        try {
+          // 从URL提取COS key
+          const urlObj = new URL(record.result_image);
+          const key = urlObj.pathname.substring(1); // 去掉开头的/
+          await deleteFile(key);
+          console.log('[cleanup] 已删除COS文件:', key);
+        } catch (cosErr) {
+          console.error('[cleanup] 删除COS文件失败:', cosErr.message);
+        }
+      }
+      // 删除数据库记录
+      await db.query('DELETE FROM usage_records WHERE id = ?', [record.id]);
+      console.log('[cleanup] 已删除记录:', record.id);
+    }
+  } catch (err) {
+    console.error('[cleanup] 清理失败:', err.message);
+  }
+}
+
+// 每天凌晨3点执行清理
+setInterval(cleanupOldRecords, 24 * 60 * 60 * 1000);
+setTimeout(cleanupOldRecords, 3 * 60 * 60 * 1000); // 启动3小时后首次执行
 
 module.exports = router;
