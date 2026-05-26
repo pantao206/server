@@ -12,6 +12,7 @@ const orderRouter = require('./routes/order');
 const adminRouter = require('./routes/admin');
 const configRouter = require('./routes/config');
 const uploadRouter = require('./routes/upload');
+const { recordRequest } = require('./utils/monitor');
 
 const app = express();
 const PORT = process.env.PORT || 3650;
@@ -26,9 +27,13 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// 请求日志
+// 请求日志和监控
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    recordRequest(req.path, res.statusCode, duration, res.statusCode >= 400);
+  });
   next();
 });
 

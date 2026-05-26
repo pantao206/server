@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统监控 - 维创AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #16c6af;
+      --success: #27ae60;
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --bg: #0f1419;
+      --card: #1a1f2e;
+      --text: #e0e6ed;
+      --text-light: #8899a6;
+      --border: #2f3a4a;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .header { background: var(--card); padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 20px; color: var(--primary); }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .status-badge { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--success); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .main { padding: 24px; }
+
+    /* 统计卡片 */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+    .stat-card .label { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+    .stat-card .value { font-size: 28px; font-weight: 600; }
+    .stat-card .value.success { color: var(--success); }
+    .stat-card .value.danger { color: var(--danger); }
+    .stat-card .value.warning { color: var(--warning); }
+    .stat-card .sub { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+
+    /* 服务器信息 */
+    .section { background: var(--card); border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; }
+    .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+    .section-body { padding: 16px 20px; }
+
+    /* 系统信息 */
+    .system-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .system-item { text-align: center; }
+    .system-item .label { font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+    .system-item .value { font-size: 20px; font-weight: 600; }
+    .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+    .progress-bar .fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.5s; }
+    .progress-bar .fill.danger { background: var(--danger); }
+    .progress-bar .fill.warning { background: var(--warning); }
+
+    /* API调用排行 */
+    .api-list { display: flex; flex-direction: column; gap: 10px; }
+    .api-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+    .api-item .path { flex: 1; font-size: 13px; font-family: monospace; color: var(--primary); }
+    .api-item .count { font-size: 14px; font-weight: 600; color: var(--text); min-width: 60px; text-align: right; }
+    .api-item .bar { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .api-item .bar .fill { height: 100%; background: var(--primary); border-radius: 3px; }
+
+    /* 实时请求 */
+    .request-table { width: 100%; }
+    .request-table th, .request-table td { padding: 10px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .request-table th { color: var(--text-light); font-weight: 500; }
+    .request-table tr:hover { background: var(--bg); }
+    .request-table .path { font-family: monospace; color: var(--primary); }
+    .request-table .status { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .status-2xx { background: rgba(39, 174, 96, 0.2); color: var(--success); }
+    .status-4xx { background: rgba(243, 156, 18, 0.2); color: var(--warning); }
+    .status-5xx { background: rgba(231, 76, 60, 0.2); color: var(--danger); }
+    .time { color: var(--text-light); font-size: 12px; }
+
+    /* 任务状态 */
+    .task-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .task-card { background: var(--bg); border-radius: 8px; padding: 16px; text-align: center; }
+    .task-card .num { font-size: 32px; font-weight: 600; }
+    .task-card .num.queued { color: var(--warning); }
+    .task-card .num.processing { color: var(--primary); }
+    .task-card .num.completed { color: var(--success); }
+    .task-card .num.failed { color: var(--danger); }
+    .task-card .label { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+
+    /* 刷新按钮 */
+    .refresh-btn { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .refresh-btn:hover { background: #12a895; }
+
+    .no-data { text-align: center; padding: 40px; color: var(--text-light); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 系统监控</h1>
+    <div class="header-right">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>在线</span>
+      </div>
+      <button class="refresh-btn" onclick="loadData()">🔄 刷新</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 概览统计 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">总请求数</div>
+        <div class="value" id="totalRequests">-</div>
+        <div class="sub">启动至今</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">QPS (1分钟内)</div>
+        <div class="value success" id="qps">-</div>
+        <div class="sub">每秒请求数</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">错误率</div>
+        <div class="value danger" id="errorRate">-</div>
+        <div class="sub">1分钟内</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">运行时长</div>
+        <div class="value" id="uptime">-</div>
+        <div class="sub" id="startTime">-</div>
+      </div>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="section">
+      <div class="section-header">
+        <span>🖥️ 服务器信息</span>
+      </div>
+      <div class="section-body">
+        <div class="system-grid">
+          <div class="system-item">
+            <div class="label">CPU 使用率</div>
+            <div class="value" id="cpuUsage">-</div>
+            <div class="progress-bar"><div class="fill" id="cpuBar" style="width: 0%"></div></div>
+          </div>
+          <div class="system-item">
+            <div class="label">内存使用</div>
+            <div class="value" id="memUsage">-</div>
+            <div class="sub" id="memDetail">- / - MB</div>
+            <div class="progress-bar"><div class="fill" id="memBar" style="width: 0%"></div></div>
+          </div>
+          <div class="system-item">
+            <div class="label">CPU 核心</div>
+            <div class="value" id="cpuCores">-</div>
+            <div class="sub">处理器核心数</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 任务队列状态 -->
+    <div class="section">
+      <div class="section-header">
+        <span>📋 任务队列</span>
+      </div>
+      <div class="section-body">
+        <div class="task-grid">
+          <div class="task-card">
+            <div class="num queued" id="taskQueued">0</div>
+            <div class="label">排队中</div>
+          </div>
+          <div class="task-card">
+            <div class="num processing" id="taskProcessing">0</div>
+            <div class="label">处理中</div>
+          </div>
+          <div class="task-card">
+            <div class="num completed" id="taskCompleted">0</div>
+            <div class="label">已完成</div>
+          </div>
+          <div class="task-card">
+            <div class="num failed" id="taskFailed">0</div>
+            <div class="label">失败</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API调用统计 -->
+    <div class="section">
+      <div class="section-header">
+        <span>📈 API 调用统计</span>
+      </div>
+      <div class="section-body">
+        <div class="api-list" id="apiList">
+          <div class="no-data">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 实时请求日志 -->
+    <div class="section">
+      <div class="section-header">
+        <span>📝 实时请求日志</span>
+        <span style="font-size: 12px; color: var(--text-light);">最近 20 条</span>
+      </div>
+      <div class="section-body">
+        <table class="request-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>路径</th>
+              <th>状态</th>
+              <th>耗时</th>
+            </tr>
+          </thead>
+          <tbody id="requestLog">
+            <tr><td colspan="4" class="no-data">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let adminToken = '';
+
+    // 获取URL参数
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    // 格式化时间
+    function formatTime(isoString) {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // 格式化时长
+    function formatUptime(seconds) {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (d > 0) return d + '天 ' + h + '小时';
+      if (h > 0) return h + '小时 ' + m + '分';
+      if (m > 0) return m + '分 ' + s + '秒';
+      return s + '秒';
+    }
+
+    // 获取状态class
+    function getStatusClass(status) {
+      if (status >= 500) return 'status-5xx';
+      if (status >= 400) return 'status-4xx';
+      return 'status-2xx';
+    }
+
+    // 加载数据
+    async function loadData() {
+      try {
+        const res = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'monitor', adminToken })
+        });
+        const json = await res.json();
+        if (json.code !== 0) {
+          alert('请先登录');
+          return;
+        }
+
+        const d = json.data;
+
+        // 更新概览
+        document.getElementById('totalRequests').textContent = d.requests.total;
+        document.getElementById('qps').textContent = d.requests.qps;
+        document.getElementById('errorRate').textContent = d.requests.errorRate + '%';
+        document.getElementById('uptime').textContent = formatUptime(d.uptime);
+        document.getElementById('startTime').textContent = new Date(Date.now() - d.uptime * 1000).toLocaleString('zh-CN');
+
+        // 更新系统信息
+        document.getElementById('cpuUsage').textContent = d.cpu.usage + '%';
+        document.getElementById('cpuCores').textContent = d.cpu.cores;
+        document.getElementById('memUsage').textContent = d.memory.usagePercent + '%';
+        document.getElementById('memDetail').textContent = d.memory.used + ' / ' + d.memory.total + ' MB';
+
+        const cpuBar = document.getElementById('cpuBar');
+        cpuBar.style.width = d.cpu.usage + '%';
+        if (d.cpu.usage > 80) cpuBar.classList.add('danger');
+        else if (d.cpu.usage > 60) cpuBar.classList.add('warning');
+        else cpuBar.classList.remove('danger', 'warning');
+
+        const memBar = document.getElementById('memBar');
+        memBar.style.width = d.memory.usagePercent + '%';
+        if (d.memory.usagePercent > 80) memBar.classList.add('danger');
+        else if (d.memory.usagePercent > 60) memBar.classList.add('warning');
+        else memBar.classList.remove('danger', 'warning');
+
+        // 更新任务状态
+        document.getElementById('taskQueued').textContent = d.taskStats.queued || 0;
+        document.getElementById('taskProcessing').textContent = d.taskStats.processing || 0;
+        document.getElementById('taskCompleted').textContent = d.taskStats.completed || 0;
+        document.getElementById('taskFailed').textContent = d.taskStats.failed || 0;
+
+        // 更新API调用统计
+        const apiList = document.getElementById('apiList');
+        const apiCalls = d.apiCalls;
+        const maxCount = Math.max(...Object.values(apiCalls), 1);
+        let html = '';
+        for (const [path, count] of Object.entries(apiCalls)) {
+          const percent = (count / maxCount * 100).toFixed(0);
+          html += `
+            <div class="api-item">
+              <span class="path">${path}</span>
+              <span class="count">${count}</span>
+              <div class="bar"><div class="fill" style="width: ${percent}%"></div></div>
+            </div>
+          `;
+        }
+        apiList.innerHTML = html || '<div class="no-data">暂无数据</div>';
+
+        // 更新请求日志
+        const tbody = document.getElementById('requestLog');
+        if (d.requests.recent && d.requests.recent.length > 0) {
+          let html = '';
+          d.requests.recent.reverse().forEach(r => {
+            html += `
+              <tr>
+                <td class="time">${formatTime(r.time)}</td>
+                <td class="path">${r.path}</td>
+                <td><span class="status ${getStatusClass(r.status)}">${r.status}</span></td>
+                <td>${r.duration}ms</td>
+              </tr>
+            `;
+          });
+          tbody.innerHTML = html;
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4" class="no-data">暂无请求</td></tr>';
+        }
+      } catch (err) {
+        console.error('加载监控数据失败:', err);
+      }
+    }
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', () => {
+      adminToken = getQueryParam('token') || '';
+      if (!adminToken) {
+        alert('请先登录后台管理');
+        location.href = 'index.html';
+        return;
+      }
+      loadData();
+      // 每5秒自动刷新
+      setInterval(loadData, 5000);
+    });
+  </script>
+</body>
+</html>

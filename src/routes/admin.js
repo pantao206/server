@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
+const { getMonitorData, updateTaskStats } = require('../utils/monitor');
 
 // 统一入口
 router.post('/', async (req, res) => {
@@ -53,6 +54,7 @@ router.post('/', async (req, res) => {
       case 'configUpdate': return updateConfig(res, d);
       case 'apiConfigGet': return getApiConfig(res, d);
       case 'apiConfigUpdate': return updateApiConfig(res, d);
+      case 'monitor': return getMonitor(req, res);
       default: return res.json({ code: -1, message: '未知action' });
     }
   } catch (err) {
@@ -267,6 +269,27 @@ async function updateApiConfig(res, d) {
     res.json({ code: 0, message: '保存成功' });
   } catch (err) {
     console.error('[updateApiConfig] SQL执行失败:', err.message);
+    res.json({ code: -1, message: err.message });
+  }
+}
+
+async function getMonitor(req, res) {
+  try {
+    // 更新任务统计
+    const [[taskStats]] = await db.query(`
+      SELECT
+        SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) as queued,
+        SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+      FROM usage_records
+    `);
+
+    const data = getMonitorData();
+    data.taskStats = taskStats;
+
+    res.json({ code: 0, data });
+  } catch (err) {
     res.json({ code: -1, message: err.message });
   }
 }
