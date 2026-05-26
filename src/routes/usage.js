@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
 const { uploadBase64Image, deleteFile } = require('../utils/cos');
+const { logTaskEvent } = require('../utils/monitor');
 
 // ========== 配置 ==========
 const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
@@ -39,10 +40,12 @@ async function processTask(task, retryCount = 0) {
   try {
     // 更新为处理中
     await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [task.id]);
+    logTaskEvent(task.id, task.openid, `调度器取出任务，开始处理`, 'info');
 
     // 获取任务详情
     const [[taskDetail]] = await db.query('SELECT * FROM usage_records WHERE id = ?', [task.id]);
     if (!taskDetail) {
+      logTaskEvent(task.id, task.openid, `任务详情为空，终止处理`, 'error');
       console.error('[processTask] 任务详情为空, task.id:', task.id);
       return;
     }
@@ -50,28 +53,32 @@ async function processTask(task, retryCount = 0) {
     console.log('[processTask] 开始处理任务', task.id, 'source_image:', taskDetail.source_image?.substring(0, 50), 'target_image:', taskDetail.target_image?.substring(0, 50));
 
     // 下载图片
+    logTaskEvent(task.id, task.openid, `开始下载源图片...`, 'info');
     const sourceBase64 = await downloadImage(taskDetail.source_image);
+    logTaskEvent(task.id, task.openid, `源图片下载完成，大小: ${(sourceBase64.length/1024).toFixed(1)}KB`, 'info');
+
+    logTaskEvent(task.id, task.openid, `开始下载目标图片...`, 'info');
     const targetBase64 = await downloadImage(taskDetail.target_image);
-    console.log('[processTask] 图片下载完成, source size:', sourceBase64.length, 'target size:', targetBase64.length);
+    logTaskEvent(task.id, task.openid, `目标图片下载完成，大小: ${(targetBase64.length/1024).toFixed(1)}KB`, 'info');
 
     // 调用 AI
     const promptText = taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
-    console.log('[processTask] 开始调用AI, prompt:', promptText.substring(0, 50));
+    logTaskEvent(task.id, task.openid, `开始调用AI接口...`, 'info');
     const result = await callAI(sourceBase64, targetBase64, promptText);
-    console.log('[processTask] AI调用成功, result length:', result?.length);
+    logTaskEvent(task.id, task.openid, `AI调用成功，返回数据大小: ${(result.length/1024).toFixed(1)}KB`, 'success');
 
     // 上传结果图片到COS
-    console.log('[processTask] 开始上传结果图片到COS...');
+    logTaskEvent(task.id, task.openid, `开始上传结果图片到COS...`, 'info');
     const cosKey = `results/${task.id}_${Date.now()}.jpg`;
     const resultUrl = await uploadBase64Image(result, cosKey);
-    console.log('[processTask] 上传成功, URL:', resultUrl);
+    logTaskEvent(task.id, task.openid, `结果图片上传成功: ${resultUrl}`, 'success');
 
     // 完成
     await db.query(
       'UPDATE usage_records SET status = "completed", result_image = ? WHERE id = ?',
       [resultUrl, task.id]
     );
-    console.log('[processTask] 任务完成, id:', task.id);
+    logTaskEvent(task.id, task.openid, `任务完成！`, 'success');
 
     // 扣除次数
     await db.query('UPDATE users SET quota = quota - ? WHERE openid = ?', [taskDetail.cost, taskDetail.openid]);
@@ -80,12 +87,14 @@ async function processTask(task, retryCount = 0) {
     await distributeCommission(taskDetail.openid, taskDetail.cost);
 
   } catch (err) {
+    logTaskEvent(task.id, task.openid, `任务失败: ${err.message}`, 'error');
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
     // 如果是 429 错误且还能重试，放回队列等调度器重试
     if (err.message.includes('429') && retryCount < RETRY_MAX) {
       await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
+      logTaskEvent(task.id, task.openid, `AI限流，任务重新排队等待重试`, 'warning');
       return;
     }
 
@@ -132,6 +141,7 @@ router.post('/create', async (req, res) => {
       [openid, type, sourceImage, targetImage, prompt || '', cost]
     );
 
+    logTaskEvent(result.insertId, openid, `任务已创建，等待调度器处理`, 'info');
     res.json({ code: 0, data: { id: result.insertId }, message: '任务已提交，请稍后查询结果' });
   } catch (err) {
     res.json({ code: -1, message: err.message });

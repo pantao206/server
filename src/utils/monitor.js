@@ -4,6 +4,7 @@ const os = require('os');
 const monitorData = {
   requests: [],      // 最近请求记录
   errors: [],        // 错误日志
+  taskLogs: [],      // 任务处理实时日志
   totalRequests: 0,
   errorCount: 0,
   startTime: Date.now(),
@@ -25,6 +26,7 @@ const monitorData = {
 const MAX_REQUESTS = 500;
 const MAX_ERRORS = 100;
 const MAX_API_CALLS = 100;
+const MAX_TASK_LOGS = 200;
 
 // 记录请求
 function recordRequest(path, status, duration, isError = false) {
@@ -55,6 +57,22 @@ function recordRequest(path, status, duration, isError = false) {
 // 更新任务状态统计
 function updateTaskStats(stats) {
   monitorData.taskStats = stats;
+}
+
+// 记录任务处理日志
+function logTaskEvent(taskId, openid, message, type = 'info') {
+  const log = {
+    taskId,
+    openid: openid ? openid.substring(0, 10) + '...' : '',
+    message,
+    type, // info, success, error, warning
+    time: new Date().toISOString()
+  };
+  monitorData.taskLogs.push(log);
+  if (monitorData.taskLogs.length > MAX_TASK_LOGS) {
+    monitorData.taskLogs.shift();
+  }
+  console.log(`[TaskLog][${type.toUpperCase()}]`, message);
 }
 
 // 记录错误
@@ -119,13 +137,15 @@ function getMonitorData() {
     errors: monitorData.errors.slice(-20).reverse(),  // 最近20条错误，倒序
     errorCount: monitorData.errorCount,
     apiCalls: monitorData.apiCalls,
-    taskStats: monitorData.taskStats
+    taskStats: monitorData.taskStats,
+    taskLogs: monitorData.taskLogs.slice(-50).reverse()  // 最近50条任务日志
   };
 }
 
 module.exports = {
   recordRequest,
   logError,
+  logTaskEvent,
   updateTaskStats,
   getMonitorData
 };
