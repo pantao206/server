@@ -259,6 +259,14 @@ async function callAI(sourceBase64, targetBase64, prompt) {
       console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
+
+    // 如果是Markdown格式的图片，提取base64数据
+    const markdownMatch = result.match(/!\[.*?\]\((data:[^)]+)\)/);
+    if (markdownMatch) {
+      result = markdownMatch[1];
+      console.log('[callAI] 从Markdown提取base64图片，长度:', result.length);
+    }
+
     console.log('[callAI] 成功, result长度:', result.length);
     return result;
   } catch (err) {
