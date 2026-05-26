@@ -245,12 +245,12 @@ async function callAI(sourceBase64, targetBase64, prompt) {
 
   if (!apiKey) throw new Error('AI API密钥未配置');
 
-  // 设置120秒超时
+  // 设置10分钟超时
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     console.log('[callAI] 超时触发');
     controller.abort();
-  }, 120000);
+  }, 600000);
 
   try {
     const requestBody = {
