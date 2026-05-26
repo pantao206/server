@@ -66,6 +66,7 @@ async function processTask(task, retryCount = 0) {
     updateTryonTaskStatus(task.id, 'ai_processing');
     const promptText = taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
     logTaskEvent(task.id, task.openid, `开始调用AI接口...`, 'info');
+    console.log('[processTask] ★★★ 开始发送AI请求，任务ID:', task.id, '时间:', new Date().toISOString());
     const result = await callAI(sourceBase64, targetBase64, promptText);
     logTaskEvent(task.id, task.openid, `AI调用成功，返回数据大小: ${(result.length/1024).toFixed(1)}KB`, 'success');
 
@@ -264,6 +265,8 @@ async function callAI(sourceBase64, targetBase64, prompt) {
       }]
     };
     console.log('[callAI] 发送请求到', apiUrl, 'body大小:', JSON.stringify(requestBody).length);
+    const requestTime = new Date().toISOString();
+    console.log('[callAI] ★请求发送时间:', requestTime);
 
     const response = await fetch(`${apiUrl}/chat/completions`, {
       method: 'POST',
@@ -276,7 +279,8 @@ async function callAI(sourceBase64, targetBase64, prompt) {
     });
 
     clearTimeout(timeout);
-    console.log('[callAI] 收到响应, status:', response.status);
+    const responseTime = new Date().toISOString();
+    console.log('[callAI] ★收到响应, status:', response.status, '响应时间:', responseTime);
 
     if (response.status === 429) {
       throw new Error('429');
