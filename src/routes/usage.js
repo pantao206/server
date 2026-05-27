@@ -239,12 +239,12 @@ async function downloadImage(url) {
   return `data:${ext};base64,` + buffer.toString('base64');
 }
 
-// 调用 AI（images/edits 格式，支持多图融合）
+// 调用 AI（OpenAI兼容格式，支持多图融合）
 async function callAI(sourceBase64, targetBase64, prompt, model) {
   const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
   const apiUrl = aiConfig?.api_url || 'https://api.apiyi.com/v1';
   const apiKey = process.env.AI_API_KEY;
-  const modelName = model || aiConfig?.model || 'gpt-image-2';
+  const modelName = model || aiConfig?.model || 'gemini-3.1-flash-image-preview';
   const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
 
   console.log('[callAI] 配置 - apiUrl:', apiUrl, 'model:', modelName, 'apiKey存在:', !!apiKey);
@@ -252,33 +252,27 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
   if (!apiKey) throw new Error('AI API密钥未配置');
 
   try {
-    // 创建 FormData
-    const FormData = require('form-data');
-    const form = new FormData();
+    // OpenAI兼容格式（chat/completions）
+    const requestBody = {
+      model: modelName,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: promptText },
+          { type: 'image_url', image_url: { url: sourceBase64 } },
+          { type: 'image_url', image_url: { url: targetBase64 } }
+        ]
+      }]
+    };
 
-    form.append('model', modelName);
-    form.append('prompt', promptText);
-    form.append('size', '1024x1024');
-    form.append('quality', 'medium');
-
-    // 添加图片1（sourceBase64是data:image/xxx;base64,格式，需要提取）
-    const base64Data1 = sourceBase64.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer1 = Buffer.from(base64Data1, 'base64');
-    form.append('image[]', imageBuffer1, { filename: 'source.png', contentType: 'image/png' });
-
-    // 添加图片2
-    const base64Data2 = targetBase64.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer2 = Buffer.from(base64Data2, 'base64');
-    form.append('image[]', imageBuffer2, { filename: 'target.png', contentType: 'image/png' });
-
-    console.log('[callAI] 发送请求到', apiUrl + '/images/edits', 'source图片大小:', (imageBuffer1.length/1024).toFixed(1) + 'KB', 'target图片大小:', (imageBuffer2.length/1024).toFixed(1) + 'KB');
+    console.log('[callAI] 发送请求到', apiUrl + '/chat/completions', 'body大小:', JSON.stringify(requestBody).length);
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await axios.post(apiUrl + '/images/edits', form, {
+    const response = await axios.post(apiUrl + '/chat/completions', requestBody, {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders()
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       timeout: 600000,
       timeoutErrorMessage: 'AI请求超时(600秒)'
@@ -294,15 +288,23 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
       throw new Error('AI错误: ' + (data.error.message || JSON.stringify(data.error)));
     }
 
-    // 提取结果（base64）
-    const resultBase64 = data?.data?.[0]?.b64_json;
-    if (!resultBase64) {
+    // 提取结果（可能是base64或URL）
+    let result = data.choices?.[0]?.message?.content;
+
+    if (!result) {
       console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data || {}));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
 
-    console.log('[callAI] 成功, 结果base64长度:', resultBase64.length);
-    return resultBase64;
+    // 如果是Markdown格式的图片，提取base64数据
+    const markdownMatch = result.match(/!\[.*?\]\((data:[^)]+)\)/);
+    if (markdownMatch) {
+      result = markdownMatch[1];
+      console.log('[callAI] 从Markdown提取base64图片，长度:', result.length);
+    }
+
+    console.log('[callAI] 成功, result长度:', result.length);
+    return result;
 
   } catch (err) {
     console.log('[callAI] 捕获异常:', err.name, err.message);
