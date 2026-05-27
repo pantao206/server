@@ -246,7 +246,7 @@ function getMonitorData() {
     errorCount: monitorData.errorCount,
     apiCalls: monitorData.apiCalls,
     taskStats: monitorData.taskStats,
-    taskLogs: monitorData.taskLogs.slice(-50).reverse(),  // 最近50条任务日志
+    taskLogs: monitorData.taskLogs.slice(-50),  // 最近50条任务日志，保持正序
     tryonTasks: getTryonTasksData(monitorData.tryonPage, monitorData.tryonPageSize),
     tryonStoragePath: monitorData.tryonStoragePath
   };
