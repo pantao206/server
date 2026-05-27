@@ -102,10 +102,10 @@ async function processTask(task, retryCount = 0) {
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
-    // 如果是 429 错误且还能重试，放回队列等调度器重试
-    if (err.message.includes('429') && retryCount < RETRY_MAX) {
+    // 429限流 或 503服务不可用 且还能重试，放回队列等调度器重试
+    if ((err.message.includes('429') || err.message.includes('503')) && retryCount < RETRY_MAX) {
       await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
-      logTaskEvent(task.id, task.openid, `AI限流，任务重新排队等待重试`, 'warning');
+      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，任务重新排队等待重试`, 'warning');
       return;
     }
 
@@ -308,6 +308,10 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     console.log('[callAI] 捕获异常:', err.name, err.message);
     if (err.code === 'ECONNABORTED') {
       throw new Error('AI请求超时(600秒)');
+    }
+    // axios 把 HTTP 错误码放在 err.response.status
+    if (err.response?.status) {
+      throw new Error(`AI服务错误(${err.response.status}): ${err.message}`);
     }
     throw err;
   }
