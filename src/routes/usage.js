@@ -102,10 +102,14 @@ async function processTask(task, retryCount = 0) {
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
-    // 429限流 或 503服务不可用 且还能重试，放回队列等调度器重试
+    // 429限流 或 503服务不可用 且还能重试，等一下再放回队列
     if ((err.message.includes('429') || err.message.includes('503')) && retryCount < RETRY_MAX) {
+      // 指数退避：3s, 6s, 9s...
+      const delay = RETRY_DELAY_BASE * (retryCount + 1);
+      console.log(`[processTask] AI限流，${delay/1000}秒后放回队列重试 (retryCount=${retryCount})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
       await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
-      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，任务重新排队等待重试`, 'warning');
+      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，${delay/1000}秒后重新排队（第${retryCount + 1}次重试）`, 'warning');
       return;
     }
 
