@@ -288,16 +288,28 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     console.log('[callAI] ★收到响应, status:', response.status, '响应时间:', responseTime);
 
     const data = response.data;
-    console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 300));
+    console.log('[callAI] 响应数据完整结构:', JSON.stringify(data).substring(0, 500));
+    console.log('[callAI] data keys:', Object.keys(data || {}));
+    console.log('[callAI] data.data:', JSON.stringify(data?.data));
+    console.log('[callAI] data.data?.[0]:', JSON.stringify(data?.data?.[0]));
 
     if (data.error) {
       throw new Error('AI错误: ' + (data.error.message || JSON.stringify(data.error)));
     }
 
-    // 提取结果（base64）
-    const resultBase64 = data?.data?.[0]?.b64_json;
+    // 提取结果（base64）- /images/edits 返回格式可能是 data[0].b64_json 或直接 base64 字符串
+    let resultBase64 = data?.data?.[0]?.b64_json;
+    // 备用：如果直接返回 base64 字符串
+    if (!resultBase64 && typeof data === 'string' && data.length > 1000) {
+      resultBase64 = data;
+    }
+    // 备用：如果返回的对象有 b64_json 在其他位置
+    if (!resultBase64 && data?.b64_json) {
+      resultBase64 = data.b64_json;
+    }
+
     if (!resultBase64) {
-      console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data || {}));
+      console.log('[callAI] 无法解析结果, data keys:', Object.keys(data || {}));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
 
