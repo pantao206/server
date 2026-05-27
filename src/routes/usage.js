@@ -241,7 +241,7 @@ async function downloadImage(url) {
   return `data:${ext};base64,` + buffer.toString('base64');
 }
 
-// 调用 AI（images/edits 格式，支持多图融合）
+// 调用 AI（chat/completions 格式，支持多图融合）
 async function callAI(sourceBase64, targetBase64, prompt, model) {
   const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
   const apiUrl = aiConfig?.api_url || 'https://api.apiyi.com/v1';
@@ -254,33 +254,33 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
   if (!apiKey) throw new Error('AI API密钥未配置');
 
   try {
-    // 创建 FormData（images/edits 格式）
-    const FormData = require('form-data');
-    const form = new FormData();
+    // 压缩图片（限制宽度512px，减少token消耗）
+    const sharp = require('sharp');
+    const sourceBuffer = await compressImage(sourceBase64, sharp);
+    const targetBuffer = await compressImage(targetBase64, sharp);
+    console.log('[callAI] 压缩后 source:', (sourceBuffer.length/1024).toFixed(1) + 'KB', 'target:', (targetBuffer.length/1024).toFixed(1) + 'KB');
 
-    form.append('model', modelName);
-    form.append('prompt', promptText);
-    form.append('size', '1024x1024');
-    form.append('quality', 'medium');
+    // chat/completions 格式
+    const requestBody = {
+      model: modelName,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: promptText },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${sourceBuffer.toString('base64')}` } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${targetBuffer.toString('base64')}` } }
+        ]
+      }]
+    };
 
-    // 添加图片1（sourceBase64是data:image/xxx;base64,格式，需要提取）
-    const base64Data1 = sourceBase64.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer1 = Buffer.from(base64Data1, 'base64');
-    form.append('image[]', imageBuffer1, { filename: 'source.png', contentType: 'image/png' });
-
-    // 添加图片2
-    const base64Data2 = targetBase64.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer2 = Buffer.from(base64Data2, 'base64');
-    form.append('image[]', imageBuffer2, { filename: 'target.png', contentType: 'image/png' });
-
-    console.log('[callAI] 发送请求到', apiUrl + '/images/edits', 'source图片大小:', (imageBuffer1.length/1024).toFixed(1) + 'KB', 'target图片大小:', (imageBuffer2.length/1024).toFixed(1) + 'KB');
+    console.log('[callAI] 发送请求到', apiUrl + '/chat/completions', 'body大小:', JSON.stringify(requestBody).length);
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await axios.post(apiUrl + '/images/edits', form, {
+    const response = await axios.post(apiUrl + '/chat/completions', requestBody, {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders()
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       timeout: 600000,
       timeoutErrorMessage: 'AI请求超时(600秒)'
@@ -290,33 +290,29 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     console.log('[callAI] ★收到响应, status:', response.status, '响应时间:', responseTime);
 
     const data = response.data;
-    console.log('[callAI] 响应数据完整结构:', JSON.stringify(data).substring(0, 500));
-    console.log('[callAI] data keys:', Object.keys(data || {}));
-    console.log('[callAI] data.data:', JSON.stringify(data?.data));
-    console.log('[callAI] data.data?.[0]:', JSON.stringify(data?.data?.[0]));
+    console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 300));
 
     if (data.error) {
       throw new Error('AI错误: ' + (data.error.message || JSON.stringify(data.error)));
     }
 
-    // 提取结果（base64）- /images/edits 返回格式可能是 data[0].b64_json 或直接 base64 字符串
-    let resultBase64 = data?.data?.[0]?.b64_json;
-    // 备用：如果直接返回 base64 字符串
-    if (!resultBase64 && typeof data === 'string' && data.length > 1000) {
-      resultBase64 = data;
-    }
-    // 备用：如果返回的对象有 b64_json 在其他位置
-    if (!resultBase64 && data?.b64_json) {
-      resultBase64 = data.b64_json;
-    }
+    // 提取结果（可能是base64或URL）
+    let result = data.choices?.[0]?.message?.content;
 
-    if (!resultBase64) {
-      console.log('[callAI] 无法解析结果, data keys:', Object.keys(data || {}));
+    if (!result) {
+      console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data || {}));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
 
-    console.log('[callAI] 成功, 结果base64长度:', resultBase64.length);
-    return resultBase64;
+    // 如果是Markdown格式的图片，提取base64数据
+    const markdownMatch = result.match(/!\[.*?\]\((data:[^)]+)\)/);
+    if (markdownMatch) {
+      result = markdownMatch[1];
+      console.log('[callAI] 从Markdown提取base64图片，长度:', result.length);
+    }
+
+    console.log('[callAI] 成功, result长度:', result.length);
+    return result;
 
   } catch (err) {
     console.log('[callAI] 捕获异常:', err.name, err.message);
@@ -329,6 +325,25 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     }
     throw err;
   }
+}
+
+// 压缩图片（限制宽度512px）
+async function compressImage(base64Data, sharp) {
+  // 提取原始buffer
+  const ext = base64Data.match(/^data:image\/(\w+);base64,/)?.[1] || 'jpeg';
+  const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+  const base64Str = base64Data.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Str, 'base64');
+
+  // 压缩：如果宽度超过512就缩小
+  const image = sharp(buffer);
+  const metadata = await image.metadata();
+  const width = metadata.width || 512;
+
+  if (width > 512) {
+    return await image.resize(512).jpeg({ quality: 80 }).toBuffer();
+  }
+  return await image.jpeg({ quality: 80 }).toBuffer();
 }
 
 // 分佣（暂时禁用）
