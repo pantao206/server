@@ -254,11 +254,20 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
   if (!apiKey) throw new Error('AI API密钥未配置');
 
   try {
-    // 压缩图片（限制宽度512px，减少token消耗）
-    const sharp = require('sharp');
-    const sourceBuffer = await compressImage(sourceBase64, sharp);
-    const targetBuffer = await compressImage(targetBase64, sharp);
-    console.log('[callAI] 压缩后 source:', (sourceBuffer.length/1024).toFixed(1) + 'KB', 'target:', (targetBuffer.length/1024).toFixed(1) + 'KB');
+    // 压缩图片 (限制宽度512px，减少token消耗)
+    let sourceBuffer, targetBuffer;
+    try {
+      const sharp = require('sharp');
+      sourceBuffer = await compressImage(sourceBase64, sharp);
+      targetBuffer = await compressImage(targetBase64, sharp);
+      console.log('[callAI] 压缩后 source:', (sourceBuffer.length/1024).toFixed(1) + 'KB', 'target:', (targetBuffer.length/1024).toFixed(1) + 'KB');
+    } catch (compressErr) {
+      console.log('[callAI] 图片压缩失败，使用原图:', compressErr.message);
+      const base64Str1 = sourceBase64.replace(/^data:image\/\w+;base64,/, '');
+      const base64Str2 = targetBase64.replace(/^data:image\/\w+;base64,/, '');
+      sourceBuffer = Buffer.from(base64Str1, 'base64');
+      targetBuffer = Buffer.from(base64Str2, 'base64');
+    }
 
     // chat/completions 格式
     const requestBody = {
