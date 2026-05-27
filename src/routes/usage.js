@@ -65,16 +65,18 @@ async function processTask(task, retryCount = 0) {
 
     // 调用 AI
     updateTryonTaskStatus(task.id, 'ai_processing');
-    const promptText = taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
-    logTaskEvent(task.id, task.openid, `开始调用AI接口...`, 'info');
-    console.log('[processTask] ★★★ 开始发送AI请求，任务ID:', task.id, '时间:', new Date().toISOString());
-    const result = await callAI(sourceBase64, targetBase64, promptText);
-    logTaskEvent(task.id, task.openid, `AI调用成功，返回数据大小: ${(result.length/1024).toFixed(1)}KB`, 'success');
+    const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
+    const model = aiConfig?.model || '未配置';
+    const promptText = aiConfig?.prompt || taskDetail.prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
+    logTaskEvent(task.id, task.openid, `开始调用AI接口...模型: ${model}`, 'info');
+    console.log('[processTask] ★★★ 开始发送AI请求，任务ID:', task.id, '模型:', model, '时间:', new Date().toISOString());
+    const result = await callAI(sourceBase64, targetBase64, promptText, model);
+    logTaskEvent(task.id, task.openid, `AI调用成功${result.startsWith('http') ? ', 图片URL' : ', 返回数据大小: ' + (result.length/1024).toFixed(1) + 'KB'}`, 'success');
 
-    // 上传结果图片（千问返回的是URL，不需要上传COS）
+    // 上传结果图片（APIYI返回base64，需要上传COS）
     let resultUrl = result;
     if (!resultUrl.startsWith('http')) {
-      logTaskEvent(task.id, task.openid, `结果非URL格式，开始上传到COS...`, 'info');
+      logTaskEvent(task.id, task.openid, `开始上传结果图片到COS...`, 'info');
       const cosKey = `results/${task.id}_${Date.now()}.jpg`;
       resultUrl = await uploadBase64Image(result, cosKey);
     }
@@ -237,48 +239,38 @@ async function downloadImage(url) {
   return `data:${ext};base64,` + buffer.toString('base64');
 }
 
-// 调用 AI（千问格式）
-async function callAI(sourceBase64, targetBase64, prompt) {
+// 调用 AI（APIYI格式，OpenAI兼容）
+async function callAI(sourceBase64, targetBase64, prompt, model) {
   const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
-  const apiUrl = aiConfig?.api_url || 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
-  const apiKey = process.env.DASHSCOPE_API_KEY || process.env.AI_API_KEY;
-  const model = aiConfig?.model;
+  const apiUrl = aiConfig?.api_url || 'https://api.apiyi.com/v1';
+  const apiKey = process.env.AI_API_KEY;
+  const modelName = model || aiConfig?.model;
   const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
 
-  console.log('[callAI] 配置 - apiUrl:', apiUrl, 'model:', model, 'apiKey存在:', !!apiKey);
+  console.log('[callAI] 配置 - apiUrl:', apiUrl, 'model:', modelName, 'apiKey存在:', !!apiKey);
 
   if (!apiKey) throw new Error('AI API密钥未配置');
-  if (!model) throw new Error('请先在后台配置模型名称（model）');
+  if (!modelName) throw new Error('请先在后台配置模型名称（model）');
 
   try {
-    // 千问格式请求体
+    // APIYI OpenAI兼容格式
     const requestBody = {
-      model: model,
-      input: {
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { image: sourceBase64 },
-              { image: targetBase64 },
-              { text: promptText }
-            ]
-          }
+      model: modelName,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: promptText },
+          { type: 'image_url', image_url: { url: sourceBase64 } },
+          { type: 'image_url', image_url: { url: targetBase64 } }
         ]
-      },
-      parameters: {
-        n: 1,
-        prompt_extend: false,
-        watermark: false,
-        size: '1024*1024'
-      }
+      }]
     };
 
-    console.log('[callAI] 发送请求到', apiUrl, 'body大小:', JSON.stringify(requestBody).length);
+    console.log('[callAI] 发送请求到', apiUrl + '/chat/completions', 'body大小:', JSON.stringify(requestBody).length);
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await axios.post(apiUrl, requestBody, {
+    const response = await axios.post(apiUrl + '/chat/completions', requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
@@ -293,20 +285,27 @@ async function callAI(sourceBase64, targetBase64, prompt) {
     const data = response.data;
     console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 300));
 
-    // 检查错误
-    if (data.code || data.error) {
-      throw new Error('AI错误: ' + (data.message || data.error || JSON.stringify(data)));
+    if (data.error) {
+      throw new Error('AI错误: ' + (data.error.message || JSON.stringify(data.error)));
     }
 
-    // 提取图片URL（千问返回的是URL，不需要上传COS）
-    const imageUrl = data?.output?.choices?.[0]?.message?.content?.[0]?.image;
-    if (!imageUrl) {
+    // 提取结果（可能是base64或URL）
+    let result = data.choices?.[0]?.message?.content;
+
+    if (!result) {
       console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data || {}));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
 
-    console.log('[callAI] 成功, 图片URL:', imageUrl);
-    return imageUrl;  // 返回的是URL，不是base64
+    // 如果是Markdown格式的图片，提取base64数据
+    const markdownMatch = result.match(/!\[.*?\]\((data:[^)]+)\)/);
+    if (markdownMatch) {
+      result = markdownMatch[1];
+      console.log('[callAI] 从Markdown提取base64图片，长度:', result.length);
+    }
+
+    console.log('[callAI] 成功, result长度:', result.length);
+    return result;
 
   } catch (err) {
     console.log('[callAI] 捕获异常:', err.name, err.message);
