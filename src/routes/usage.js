@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../utils/db');
+const axios = require('axios');
 const { uploadBase64Image, deleteFile } = require('../utils/cos');
 const { logTaskEvent, initTryonTask, updateTryonTaskStatus, setTryonTaskError } = require('../utils/monitor');
 
@@ -245,13 +246,6 @@ async function callAI(sourceBase64, targetBase64, prompt) {
 
   if (!apiKey) throw new Error('AI API密钥未配置');
 
-  // 设置10分钟超时
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    console.log('[callAI] 超时触发');
-    controller.abort();
-  }, 600000);
-
   try {
     const requestBody = {
       model: model,
@@ -268,17 +262,15 @@ async function callAI(sourceBase64, targetBase64, prompt) {
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: 'POST',
+    const response = await axios.post(`${apiUrl}/chat/completions`, requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
+      timeout: 600000, // 10分钟超时
+      timeoutErrorMessage: 'AI请求超时(600秒)'
     });
 
-    clearTimeout(timeout);
     const responseTime = new Date().toISOString();
     console.log('[callAI] ★收到响应, status:', response.status, '响应时间:', responseTime);
 
@@ -286,13 +278,7 @@ async function callAI(sourceBase64, targetBase64, prompt) {
       throw new Error('429');
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.log('[callAI] 响应错误:', errText);
-      throw new Error(`API错误 ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
+    const data = response.data;
     console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 300));
 
     // 检查不同返回格式
@@ -325,10 +311,9 @@ async function callAI(sourceBase64, targetBase64, prompt) {
     console.log('[callAI] 成功, result长度:', result.length);
     return result;
   } catch (err) {
-    clearTimeout(timeout);
     console.log('[callAI] 捕获异常:', err.name, err.message);
-    if (err.name === 'AbortError') {
-      throw new Error('AI请求超时(120秒)');
+    if (err.code === 'ECONNABORTED') {
+      throw new Error('AI请求超时(600秒)');
     }
     throw err;
   }
