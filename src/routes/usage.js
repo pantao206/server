@@ -78,7 +78,9 @@ async function processTask(task, retryCount = 0) {
     if (!resultUrl.startsWith('http')) {
       logTaskEvent(task.id, task.openid, `开始上传结果图片到COS...`, 'info');
       const cosKey = `results/${task.id}_${Date.now()}.jpg`;
-      resultUrl = await uploadBase64Image(result, cosKey);
+      // 补全 base64 前缀（uploadBase64Image 需要 data:image/xxx;base64, 格式）
+      const base64WithPrefix = result.startsWith('data:') ? result : `data:image/jpeg;base64,${result}`;
+      resultUrl = await uploadBase64Image(base64WithPrefix, cosKey);
     }
     logTaskEvent(task.id, task.openid, `结果图片URL: ${resultUrl}`, 'success');
 
