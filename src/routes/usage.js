@@ -240,14 +240,15 @@ async function downloadImage(url) {
 // 调用 AI（千问格式）
 async function callAI(sourceBase64, targetBase64, prompt) {
   const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
-  const apiUrl = aiConfig?.api_url || process.env.AI_API_URL || 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+  const apiUrl = aiConfig?.api_url || 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
   const apiKey = process.env.DASHSCOPE_API_KEY || process.env.AI_API_KEY;
-  const model = aiConfig?.model || process.env.AI_MODEL || 'qwen-image-2.0-pro';
+  const model = aiConfig?.model;
   const promptText = aiConfig?.prompt || prompt || 'Replace the hairstyle in the first image with the hairstyle in the second image';
 
   console.log('[callAI] 配置 - apiUrl:', apiUrl, 'model:', model, 'apiKey存在:', !!apiKey);
 
   if (!apiKey) throw new Error('AI API密钥未配置');
+  if (!model) throw new Error('请先在后台配置模型名称（model）');
 
   try {
     // 千问格式请求体
