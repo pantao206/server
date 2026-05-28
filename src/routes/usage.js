@@ -241,7 +241,7 @@ async function downloadImage(url) {
   return `data:${ext};base64,` + buffer.toString('base64');
 }
 
-// 调用 AI（chat/completions 格式，支持多图融合）
+// 调用 AI（generateContent 格式，谷歌Gemini风格）
 async function callAI(sourceBase64, targetBase64, prompt, model) {
   const [[aiConfig]] = await db.query('SELECT api_url, model, prompt FROM config WHERE type = "ai" LIMIT 1');
   const apiUrl = aiConfig?.api_url || 'https://api.apiyi.com/v1';
@@ -254,11 +254,10 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
   if (!apiKey) throw new Error('AI API密钥未配置');
 
   try {
-    // 压缩图片 (限制宽度512px，减少token消耗)
+    // 压缩图片（限制宽度512px，减少token消耗）
     let sourceBuffer, targetBuffer;
     try {
       const sharp = require('sharp');
-      console.log('[callAI] sharp 版本:', sharp.versions);
       sourceBuffer = await compressImage(sourceBase64, sharp);
       targetBuffer = await compressImage(targetBase64, sharp);
       console.log('[callAI] 压缩后 source:', (sourceBuffer.length/1024).toFixed(1) + 'KB', 'target:', (targetBuffer.length/1024).toFixed(1) + 'KB');
@@ -270,24 +269,26 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
       targetBuffer = Buffer.from(base64Str2, 'base64');
     }
 
-    // chat/completions 格式
+    // generateContent 格式（谷歌Gemini风格）
     const requestBody = {
-      model: modelName,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: promptText },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${sourceBuffer.toString('base64')}` } },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${targetBuffer.toString('base64')}` } }
+      contents: [{
+        parts: [
+          { text: promptText },
+          { inlineData: { mimeType: 'image/jpeg', data: sourceBuffer.toString('base64') } },
+          { inlineData: { mimeType: 'image/jpeg', data: targetBuffer.toString('base64') } }
         ]
-      }]
+      }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+        imageConfig: { aspectRatio: '1:1', imageSize: '1K' }
+      }
     };
 
-    console.log('[callAI] 发送请求到', apiUrl + '/chat/completions', 'body大小:', JSON.stringify(requestBody).length);
+    console.log('[callAI] 发送请求到', apiUrl + '/v1beta/models/' + modelName + ':generateContent', 'body大小:', JSON.stringify(requestBody).length);
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await axios.post(apiUrl + '/chat/completions', requestBody, {
+    const response = await axios.post(apiUrl + '/v1beta/models/' + modelName + ':generateContent', requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
@@ -300,29 +301,23 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     console.log('[callAI] ★收到响应, status:', response.status, '响应时间:', responseTime);
 
     const data = response.data;
-    console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 300));
+    console.log('[callAI] 响应数据:', JSON.stringify(data).substring(0, 500));
 
     if (data.error) {
       throw new Error('AI错误: ' + (data.error.message || JSON.stringify(data.error)));
     }
 
-    // 提取结果（可能是base64或URL）
-    let result = data.choices?.[0]?.message?.content;
+    // 提取结果（inlineData）
+    const resultBase64 = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
-    if (!result) {
-      console.log('[callAI] 无法解析结果, data.keys:', Object.keys(data || {}));
+    if (!resultBase64) {
+      console.log('[callAI] 无法解析结果, data keys:', Object.keys(data || {}));
+      console.log('[callAI] candidates:', JSON.stringify(data?.candidates));
       throw new Error('AI返回格式错误: ' + JSON.stringify(data).substring(0, 100));
     }
 
-    // 如果是Markdown格式的图片，提取base64数据
-    const markdownMatch = result.match(/!\[.*?\]\((data:[^)]+)\)/);
-    if (markdownMatch) {
-      result = markdownMatch[1];
-      console.log('[callAI] 从Markdown提取base64图片，长度:', result.length);
-    }
-
-    console.log('[callAI] 成功, result长度:', result.length);
-    return result;
+    console.log('[callAI] 成功, result长度:', resultBase64.length);
+    return resultBase64;
 
   } catch (err) {
     console.log('[callAI] 捕获异常:', err.name, err.message);
