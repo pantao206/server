@@ -33,18 +33,18 @@ async function getMaxConcurrent() {
 // ========== 定时器（每100ms检查一次）==========
 setInterval(async () => {
   try {
-    // 有空位吗？
-    const maxConcurrent = await getMaxConcurrent();
-    if (isProcessing >= maxConcurrent) return;
-
-    // 有排队任务吗？
+    // 第一时间检查有没有排队的任务
     const [[task]] = await db.query(
       'SELECT * FROM usage_records WHERE status = "queued" ORDER BY created_at ASC LIMIT 1'
     );
 
-    if (!task) return;
+    if (!task) return; // 没有排队任务，结束这一轮
 
-    // 有空位，取1个任务处理
+    // 有排队任务，检查有没有空位
+    const maxConcurrent = await getMaxConcurrent();
+    if (isProcessing >= maxConcurrent) return; // 没有空位，结束这一轮
+
+    // 有排队任务又有空位，取1个任务处理
     isProcessing++;
     processTask(task, task.retry_count || 0).catch(err => console.error('Task failed:', err));
   } catch (err) {
