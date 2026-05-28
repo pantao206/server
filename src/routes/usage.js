@@ -284,11 +284,11 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
       }
     };
 
-    console.log('[callAI] 发送请求到', apiUrl + '/v1beta/models/' + modelName + ':generateContent', 'body大小:', JSON.stringify(requestBody).length);
+    console.log('[callAI] 发送请求到', apiUrl.replace('/v1', '') + '/v1beta/models/' + modelName + ':generateContent', 'body大小:', JSON.stringify(requestBody).length);
     const requestTime = new Date().toISOString();
     console.log('[callAI] ★请求发送时间:', requestTime);
 
-    const response = await axios.post(apiUrl + '/v1beta/models/' + modelName + ':generateContent', requestBody, {
+    const response = await axios.post(apiUrl.replace('/v1', '') + '/v1beta/models/' + modelName + ':generateContent', requestBody, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
