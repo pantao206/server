@@ -280,7 +280,7 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
       }],
       generationConfig: {
         responseModalities: ['IMAGE'],
-        imageConfig: { aspectRatio: '1:1', imageSize: '1K' }
+        imageConfig: { aspectRatio: '9:16', imageSize: '2K' }
       }
     };
 
