@@ -55,6 +55,14 @@ setInterval(async () => {
 // ========== 处理任务 ==========
 async function processTask(task, retryCount = 0) {
   try {
+    // 再次检查任务状态，防止已取消的任务被处理
+    const [[taskCheck]] = await db.query('SELECT status FROM usage_records WHERE id = ?', [task.id]);
+    if (!taskCheck || taskCheck.status !== 'queued') {
+      console.log('[processTask] 任务已被取消或状态已变更，跳过处理 task.id:', task.id);
+      isProcessing--; // 回退计数器
+      return;
+    }
+
     // 更新为处理中
     await db.query('UPDATE usage_records SET status = "processing" WHERE id = ?', [task.id]);
     updateTryonTaskStatus(task.id, 'processing');
@@ -65,6 +73,7 @@ async function processTask(task, retryCount = 0) {
     if (!taskDetail) {
       logTaskEvent(task.id, task.openid, `任务详情为空，终止处理`, 'error');
       console.error('[processTask] 任务详情为空, task.id:', task.id);
+      isProcessing--; // 确保计数器回退
       return;
     }
 
@@ -120,10 +129,13 @@ async function processTask(task, retryCount = 0) {
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
-    // 429限流 或 503服务不可用 且还能重试，放回队列等调度器重试
+    // 429限流 或 503服务不可用 且还能重试，延迟3秒后放回队列
     if ((err.message.includes('429') || err.message.includes('503')) && retryCount < RETRY_MAX) {
+      console.log(`[processTask] 等待3秒后重试 (retryCount=${retryCount})`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
       await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
-      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，任务重新排队等待重试`, 'warning');
+      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，3秒后重新排队（第${retryCount + 1}次重试）`, 'warning');
+      // 注意：这里不回退 isProcessing，因为任务已经放回队列了，等下次调度器自然处理
       return;
     }
 
@@ -225,6 +237,17 @@ router.post('/delete', async (req, res) => {
     const [[record]] = await db.query('SELECT * FROM usage_records WHERE id = ? AND openid = ?', [id, openid]);
     if (!record) return res.json({ code: -1, message: '记录不存在' });
 
+    // 如果是排队中的任务，调度器还没开始处理，可以直接删除
+    if (record.status === 'queued') {
+      await db.query('DELETE FROM usage_records WHERE id = ?', [id]);
+      return res.json({ code: 0, message: '取消成功，任务已删除' });
+    }
+
+    // 如果是处理中的任务，不允许删除（防止数据不一致）
+    if (record.status === 'processing' || record.status === 'ai_processing') {
+      return res.json({ code: -1, message: '任务处理中，无法取消' });
+    }
+
     // 删除COS图片
     if (record.result_image && record.result_image.startsWith('http')) {
       try {
@@ -239,6 +262,16 @@ router.post('/delete', async (req, res) => {
     // 删除数据库记录
     await db.query('DELETE FROM usage_records WHERE id = ?', [id]);
     res.json({ code: 0, message: '删除成功' });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+});
+
+// ========== 查询排队人数 ==========
+router.post('/queueCount', async (req, res) => {
+  try {
+    const [result] = await db.query('SELECT COUNT(*) as count FROM usage_records WHERE status = "queued"');
+    res.json({ code: 0, data: { count: result[0].count } });
   } catch (err) {
     res.json({ code: -1, message: err.message });
   }
