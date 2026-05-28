@@ -18,9 +18,9 @@ async function getMaxConcurrent() {
   // 每60秒刷新一次配置
   if (now - lastConfigRefresh > CONFIG_CACHE_TTL) {
     try {
-      const [[config]] = await db.query('SELECT value FROM config WHERE name = "max_concurrent" LIMIT 1');
-      if (config?.value) {
-        cachedMaxConcurrent = parseInt(config.value) || 100;
+      const [[config]] = await db.query('SELECT max_concurrent FROM config WHERE type = "public" LIMIT 1');
+      if (config?.max_concurrent) {
+        cachedMaxConcurrent = parseInt(config.max_concurrent) || 100;
       }
     } catch (err) {
       console.error('[getMaxConcurrent] 读取配置失败:', err.message);
