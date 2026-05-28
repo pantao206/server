@@ -258,6 +258,7 @@ async function callAI(sourceBase64, targetBase64, prompt, model) {
     let sourceBuffer, targetBuffer;
     try {
       const sharp = require('sharp');
+      console.log('[callAI] sharp 版本:', sharp.versions);
       sourceBuffer = await compressImage(sourceBase64, sharp);
       targetBuffer = await compressImage(targetBase64, sharp);
       console.log('[callAI] 压缩后 source:', (sourceBuffer.length/1024).toFixed(1) + 'KB', 'target:', (targetBuffer.length/1024).toFixed(1) + 'KB');
