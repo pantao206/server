@@ -5,30 +5,46 @@ const axios = require('axios');
 const { uploadBase64Image, deleteFile } = require('../utils/cos');
 const { logTaskEvent, initTryonTask, updateTryonTaskStatus, setTryonTaskError } = require('../utils/monitor');
 
-// ========== 配置 ==========
-const MAX_CONCURRENT = 100; // 最多同时处理任务数，从 config.max_concurrent 读取
-const MAX_RPM = 3000; // 每分钟最多请求数，从 config.max_rpm 读取
-const MAX_PER_SECOND = 40; // 每秒最多发给AI的任务数，防止突发压力
-const RETRY_MAX = 3; // 最大重试次数
-const RETRY_DELAY_BASE = 2000; // 基础重试延迟（毫秒），指数退避
-
 // ========== 状态 ==========
 let isProcessing = 0; // 当前正在处理的任务数
-let lastProcessTime = Date.now();
-let rpmToken = MAX_RPM; // 当前的 RPM token
-let lastRpmReset = Date.now();
+let cachedMaxConcurrent = 100; // 缓存的最大并发数
+let lastConfigRefresh = 0; // 上次刷新配置的时间
+const CONFIG_CACHE_TTL = 60000; // 配置缓存时间（60秒）
+const RETRY_MAX = 3; // 最大重试次数
+
+// ========== 获取最大并发配置 ==========
+async function getMaxConcurrent() {
+  const now = Date.now();
+  // 每60秒刷新一次配置
+  if (now - lastConfigRefresh > CONFIG_CACHE_TTL) {
+    try {
+      const [[config]] = await db.query('SELECT value FROM config WHERE name = "max_concurrent" LIMIT 1');
+      if (config?.value) {
+        cachedMaxConcurrent = parseInt(config.value) || 100;
+      }
+    } catch (err) {
+      console.error('[getMaxConcurrent] 读取配置失败:', err.message);
+    }
+    lastConfigRefresh = now;
+  }
+  return cachedMaxConcurrent;
+}
 
 // ========== 定时器（每100ms检查一次）==========
 setInterval(async () => {
   try {
-    if (isProcessing >= MAX_CONCURRENT) return;
+    // 有空位吗？
+    const maxConcurrent = await getMaxConcurrent();
+    if (isProcessing >= maxConcurrent) return;
 
+    // 有排队任务吗？
     const [[task]] = await db.query(
       'SELECT * FROM usage_records WHERE status = "queued" ORDER BY created_at ASC LIMIT 1'
     );
 
     if (!task) return;
 
+    // 有空位，取1个任务处理
     isProcessing++;
     processTask(task, task.retry_count || 0).catch(err => console.error('Task failed:', err));
   } catch (err) {
