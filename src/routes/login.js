@@ -66,8 +66,8 @@ router.post('/', async (req, res) => {
     } else {
       // 创建新用户
       const [result] = await db.query(
-        'INSERT INTO users (openid, nickname, avatarUrl, quota, created_at) VALUES (?, ?, ?, 0, NOW())',
-        [openid, nickname || '微信用户', avatarUrl || '']
+        'INSERT INTO users (openid, nickname, avatarUrl, quota, referred_by, created_at) VALUES (?, ?, ?, 0, ?, NOW())',
+        [openid, nickname || '微信用户', avatarUrl || '', agentCode || null]
       );
 
       return res.json({

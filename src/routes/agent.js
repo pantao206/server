@@ -119,11 +119,90 @@ router.post('/applyWithdraw', async (req, res) => {
 router.post('/referrals', async (req, res) => {
   try {
     const openid = req.headers['x-openid'];
+    const { page = 1, pageSize = 10 } = req.body;
+    const offset = (page - 1) * pageSize;
+
+    const [agents] = await db.query('SELECT id, code FROM agents WHERE openid = ? AND status = "active"', [openid]);
+    if (agents.length === 0) return res.json({ code: -1, message: '非代理用户' });
+
+    const agent = agents[0];
+
+    // 通过 agent_code 查找推荐的用户
+    const [users] = await db.query(
+      'SELECT nickname, avatarUrl, created_at FROM users WHERE referred_by = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [agent.code, pageSize, offset]
+    );
+
+    const list = users.map(u => ({
+      nickname: u.nickname || '微信用户',
+      avatarUrl: u.avatarUrl,
+      createdAt: u.created_at
+    }));
+
+    res.json({ code: 0, data: { list } });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+});
+
+// 获取佣金明细
+router.post('/incomes', async (req, res) => {
+  try {
+    const openid = req.headers['x-openid'];
+    const { page = 1, pageSize = 10 } = req.body;
+    const offset = (page - 1) * pageSize;
+
     const [agents] = await db.query('SELECT id FROM agents WHERE openid = ? AND status = "active"', [openid]);
     if (agents.length === 0) return res.json({ code: -1, message: '非代理用户' });
 
-    // TODO: 需要在users表添加agent_id字段或建立推荐关系表才能实现推荐用户列表
-    res.json({ code: 0, data: [], message: '推荐功能暂时禁用' });
+    const agentId = agents[0].id;
+
+    const [records] = await db.query(
+      'SELECT * FROM agent_incomes WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [agentId, pageSize, offset]
+    );
+
+    const list = records.map(r => ({
+      id: r.id,
+      description: r.description,
+      amount: r.amount,
+      source: r.source,
+      createdAt: r.created_at
+    }));
+
+    res.json({ code: 0, data: { list } });
+  } catch (err) {
+    res.json({ code: -1, message: err.message });
+  }
+});
+
+// 获取提现记录
+router.post('/getWithdrawals', async (req, res) => {
+  try {
+    const openid = req.headers['x-openid'];
+    const { page = 1, pageSize = 10 } = req.body;
+    const offset = (page - 1) * pageSize;
+
+    const [agents] = await db.query('SELECT id FROM agents WHERE openid = ? AND status = "active"', [openid]);
+    if (agents.length === 0) return res.json({ code: -1, message: '非代理用户' });
+
+    const agentId = agents[0].id;
+
+    const [records] = await db.query(
+      'SELECT * FROM agent_withdrawals WHERE agent_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [agentId, pageSize, offset]
+    );
+
+    const list = records.map(r => ({
+      id: r.id,
+      amount: r.amount,
+      alipayAccount: r.alipay_account,
+      alipayName: r.alipay_name,
+      status: r.status,
+      createdAt: r.created_at
+    }));
+
+    res.json({ code: 0, data: { list } });
   } catch (err) {
     res.json({ code: -1, message: err.message });
   }

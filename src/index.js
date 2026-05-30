@@ -12,6 +12,7 @@ const orderRouter = require('./routes/order');
 const adminRouter = require('./routes/admin');
 const configRouter = require('./routes/config');
 const uploadRouter = require('./routes/upload');
+const qrcodeRouter = require('./routes/qrcode');
 const { recordRequest, logError } = require('./utils/monitor');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/order', orderRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/config', configRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/qrcode', qrcodeRouter);
 
 // 健康检查
 app.get('/health', (req, res) => {

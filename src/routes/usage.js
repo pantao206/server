@@ -54,6 +54,8 @@ setInterval(async () => {
 
 // ========== 处理任务 ==========
 async function processTask(task, retryCount = 0) {
+  let isRetrying = false; // 是否在重试中，重试时不走 finally 的 isProcessing--
+
   try {
     // 再次检查任务状态，防止已取消的任务被处理
     const [[taskCheck]] = await db.query('SELECT status FROM usage_records WHERE id = ?', [task.id]);
@@ -123,19 +125,25 @@ async function processTask(task, retryCount = 0) {
     // 分佣
     await distributeCommission(taskDetail.openid, taskDetail.cost);
 
+    isProcessing--;
+    console.log('[processTask] 完成, isProcessing:', isProcessing);
+
   } catch (err) {
     logTaskEvent(task.id, task.openid, `任务失败: ${err.message}`, 'error');
     setTryonTaskError(task.id, err.message);
     console.error('[processTask] 任务失败, id:', task.id, 'error:', err.message);
     console.error('[processTask] Stack:', err.stack);
 
-    // 429限流 或 503服务不可用 且还能重试，延迟3秒后放回队列
+    // 429限流 或 503服务不可用 且还能重试，延迟后放回队列
     if ((err.message.includes('429') || err.message.includes('503')) && retryCount < RETRY_MAX) {
-      console.log(`[processTask] 等待3秒后重试 (retryCount=${retryCount})`);
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      isRetrying = true;
+      // 指数退避：3s, 6s, 9s
+      const delay = 3000 * (retryCount + 1);
+      console.log(`[processTask] 等待${delay/1000}秒后重试 (retryCount=${retryCount})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
       await db.query('UPDATE usage_records SET status = "queued", retry_count = ? WHERE id = ?', [retryCount + 1, task.id]);
-      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，3秒后重新排队（第${retryCount + 1}次重试）`, 'warning');
-      // 注意：这里不回退 isProcessing，因为任务已经放回队列了，等下次调度器自然处理
+      logTaskEvent(task.id, task.openid, `AI限流/服务不可用(${err.message})，${delay/1000}秒后重新排队（第${retryCount + 1}次重试）`, 'warning');
+      // 不回退 isProcessing，slot 保持占用，等下次自然调度
       return;
     }
 
@@ -144,9 +152,8 @@ async function processTask(task, retryCount = 0) {
       'UPDATE usage_records SET status = "failed", error = ? WHERE id = ?',
       [err.message, task.id]
     );
-  } finally {
     isProcessing--;
-    console.log('[processTask] finally, isProcessing:', isProcessing);
+    console.log('[processTask] 失败, isProcessing:', isProcessing);
   }
 }
 
@@ -239,6 +246,11 @@ router.post('/delete', async (req, res) => {
 
     // 如果是排队中的任务，调度器还没开始处理，可以直接删除
     if (record.status === 'queued') {
+      // 检查排队人数，必须>80才能取消
+      const [[countResult]] = await db.query('SELECT COUNT(*) as count FROM usage_records WHERE status = "queued"');
+      if (countResult.count <= 80) {
+        return res.json({ code: -1, message: '排队人数少于80人，无法取消' });
+      }
       await db.query('DELETE FROM usage_records WHERE id = ?', [id]);
       return res.json({ code: 0, message: '取消成功，任务已删除' });
     }
@@ -400,9 +412,36 @@ async function compressImage(base64Data, sharp) {
   return await image.jpeg({ quality: 80 }).toBuffer();
 }
 
-// 分佣（暂时禁用）
+// 分佣
 async function distributeCommission(openid, cost) {
-  return; // 禁用，users表无agent_id字段
+  try {
+    // 1. 查用户是谁推荐的
+    const [[user]] = await db.query('SELECT referred_by FROM users WHERE openid = ?', [openid]);
+    if (!user?.referred_by) return;
+
+    // 2. 查推荐人（代理）
+    const [[agent]] = await db.query('SELECT id, balance, total_earned FROM agents WHERE code = ? AND status = "active"', [user.referred_by]);
+    if (!agent) return;
+
+    // 3. 计算佣金（30%）
+    const commission = cost * 0.3;
+
+    // 4. 写入佣金明细
+    await db.query(
+      'INSERT INTO agent_incomes (agent_id, openid, source, description, amount, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+      [agent.id, openid, 'tryon', '用户使用AI换发', commission]
+    );
+
+    // 5. 更新代理余额和总收入
+    await db.query(
+      'UPDATE agents SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?',
+      [commission, commission, agent.id]
+    );
+
+    console.log('[distributeCommission] 代理', agent.id, '获得佣金', commission);
+  } catch (err) {
+    console.error('[distributeCommission] 佣金分配失败:', err.message);
+  }
 }
 
 // ========== 清理7天前的换发记录和COS图片 ==========

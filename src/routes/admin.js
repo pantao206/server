@@ -276,18 +276,37 @@ async function getApiConfig(res, d) {
 }
 
 async function updateApiConfig(res, d) {
-  const { type = 'ai', api_url = '', model = '', prompt = '' } = d;
+  const { type = 'ai', api_url = '', model = '', prompt = '', price_normal, price_avatar, max_concurrent } = d;
   try {
-    // 直接用 UPDATE，因为 type='ai' 的记录已经存在
+    // 构建更新字段
+    let updates = [];
+    let params = [];
+    if (api_url !== undefined) { updates.push('api_url = ?'); params.push(api_url); }
+    if (model !== undefined) { updates.push('model = ?'); params.push(model); }
+    if (prompt !== undefined) { updates.push('prompt = ?'); params.push(prompt); }
+    if (price_normal !== undefined) { updates.push('price_normal = ?'); params.push(price_normal); }
+    if (price_avatar !== undefined) { updates.push('price_avatar = ?'); params.push(price_avatar); }
+    if (max_concurrent !== undefined) { updates.push('max_concurrent = ?'); params.push(max_concurrent); }
+
+    if (updates.length === 0) {
+      return res.json({ code: -1, message: '没有要保存的配置' });
+    }
+
+    params.push(type);
+
     const [result] = await db.query(
-      `UPDATE config SET api_url = ?, model = ?, prompt = ?, updated_at = NOW() WHERE type = ?`,
-      [api_url, model, prompt, type]
+      `UPDATE config SET ${updates.join(', ')}, updated_at = NOW() WHERE type = ?`,
+      params
     );
+
     // 如果没有匹配到记录，则插入
     if (result.affectedRows === 0) {
+      const fields = [...updates.map(u => u.split(' = ')[0]), 'type', 'created_at', 'updated_at'];
+      const placeholders = updates.map(() => '?').join(', ');
+      const values = [...params.slice(0, -1), type, 'NOW()', 'NOW()'];
       await db.query(
-        `INSERT INTO config (type, api_url, api_key, model, prompt, created_at, updated_at) VALUES (?, ?, '', ?, ?, NOW(), NOW())`,
-        [type, api_url, model, prompt]
+        `INSERT INTO config (${fields.join(', ')}) VALUES (${placeholders}, ?, ?, ?)`,
+        values
       );
     }
     res.json({ code: 0, message: '保存成功' });
