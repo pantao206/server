@@ -51,14 +51,14 @@ router.post('/apply', async (req, res) => {
     const [existing] = await db.query('SELECT * FROM agents WHERE openid = ? AND status = "active"', [openid]);
     if (existing.length > 0) return res.json({ code: -1, message: '您已经是代理了' });
 
-    // 检查消费满10元
-    const [orders] = await db.query(
-      'SELECT SUM(amount) as total FROM orders WHERE openid = ? AND status = "paid"', [openid]
-    );
-    const totalConsumed = orders[0]?.total || 0;
-    if (totalConsumed < 10) {
-      return res.json({ code: -1, message: `累计消费满10元才能申请代理，当前消费：${totalConsumed.toFixed(2)}元` });
-    }
+    // TODO: 申请门槛检查（暂时禁用）
+    // const [orders] = await db.query(
+    //   'SELECT SUM(amount) as total FROM orders WHERE openid = ? AND status = "paid"', [openid]
+    // );
+    // const totalConsumed = orders[0]?.total || 0;
+    // if (totalConsumed < 10) {
+    //   return res.json({ code: -1, message: `累计消费满10元才能申请代理，当前消费：${totalConsumed.toFixed(2)}元` });
+    // }
 
     // 创建申请
     const code = 'AG' + Date.now().toString(36).toUpperCase();
