@@ -235,8 +235,8 @@ async function createAgent(res, d) {
 }
 
 async function updateAgent(res, d) {
-  const { id, name, phone, commission = 30, status = 'active', balance = 0 } = d;
-  await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?', [name, phone, commission, status, balance, id]);
+  const { _id, name, phone, commission = 30, status = 'active', balance = 0 } = d;
+  await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?', [name, phone, commission, status, balance, _id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
