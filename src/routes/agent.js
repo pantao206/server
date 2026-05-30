@@ -47,9 +47,9 @@ router.post('/apply', async (req, res) => {
 
     if (!name || !phone) return res.json({ code: -1, message: '请填写姓名和手机号' });
 
-    // 检查是否已是代理
-    const [existing] = await db.query('SELECT * FROM agents WHERE openid = ? AND status = "active"', [openid]);
-    if (existing.length > 0) return res.json({ code: -1, message: '您已经是代理了' });
+    // 检查是否已是代理（已通过或待审核都不能再申请）
+    const [existing] = await db.query('SELECT * FROM agents WHERE openid = ? AND status IN ("active", "pending")', [openid]);
+    if (existing.length > 0) return res.json({ code: -1, message: '您已经申请过代理了，请等待审核' });
 
     // TODO: 申请门槛检查（暂时禁用）
     // const [orders] = await db.query(
