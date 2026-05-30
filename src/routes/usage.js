@@ -481,8 +481,27 @@ async function cleanupOldRecords() {
   }
 }
 
+// 计算下次凌晨3点的时间
+function getNext3AM() {
+  const now = new Date();
+  const next3AM = new Date(now);
+  next3AM.setHours(3, 0, 0, 0);
+  if (next3AM <= now) {
+    next3AM.setDate(next3AM.getDate() + 1);
+  }
+  return next3AM.getTime() - now.getTime();
+}
+
 // 每天凌晨3点执行清理
-setInterval(cleanupOldRecords, 24 * 60 * 60 * 1000);
-setTimeout(cleanupOldRecords, 3 * 60 * 60 * 1000); // 启动3小时后首次执行
+function scheduleCleanup() {
+  const delay = getNext3AM();
+  setTimeout(() => {
+    cleanupOldRecords();
+    // 之后每24小时执行一次
+    setInterval(cleanupOldRecords, 24 * 60 * 60 * 1000);
+  }, delay);
+}
+
+scheduleCleanup();
 
 module.exports = router;

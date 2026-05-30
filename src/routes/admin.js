@@ -86,8 +86,8 @@ async function loadUserList(res, d) {
 }
 
 async function updateUser(res, d) {
-  const { _id, nickName, phone, balance } = d;
-  await db.query('UPDATE users SET nickname = ?, phone = ?, quota = ? WHERE openid = ?', [nickName, phone, balance, _id]);
+  const { id, nickName, phone, balance } = d;
+  await db.query('UPDATE users SET nickname = ?, phone = ?, quota = ? WHERE openid = ?', [nickName, phone, balance, id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
@@ -108,7 +108,8 @@ async function loadOrderList(res, d) {
 }
 
 async function updateOrder(res, d) {
-  await db.query('UPDATE orders SET status = ? WHERE id = ?', [d.status, d._id]);
+  const { id, status } = d;
+  await db.query('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
@@ -155,8 +156,8 @@ async function createCategory(res, d) {
 }
 
 async function updateCategory(res, d) {
-  const { _id, name, key, sort = 0 } = d;
-  await db.query('UPDATE categories SET name = ?, ckey = ?, sort = ? WHERE id = ?', [name, key, sort, _id]);
+  const { id, name, key, sort = 0 } = d;
+  await db.query('UPDATE categories SET name = ?, ckey = ?, sort = ? WHERE id = ?', [name, key, sort, id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
@@ -180,8 +181,8 @@ async function createHairstyle(res, d) {
 }
 
 async function updateHairstyle(res, d) {
-  const { _id, name, category, image, sort = 0, hot = false } = d;
-  await db.query('UPDATE hairstyles SET name = ?, category = ?, image = ?, is_hot = ?, sort = ?, updated_at = NOW() WHERE id = ?', [name, category, image, hot ? 1 : 0, sort, _id]);
+  const { id, name, category, image, sort = 0, hot = false } = d;
+  await db.query('UPDATE hairstyles SET name = ?, category = ?, image = ?, is_hot = ?, sort = ?, updated_at = NOW() WHERE id = ?', [name, category, image, hot ? 1 : 0, sort, id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
@@ -234,8 +235,8 @@ async function createAgent(res, d) {
 }
 
 async function updateAgent(res, d) {
-  const { _id, name, phone, commission = 30, status = 'active', balance = 0 } = d;
-  await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?', [name, phone, commission, status, balance, _id]);
+  const { id, name, phone, commission = 30, status = 'active', balance = 0 } = d;
+  await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?', [name, phone, commission, status, balance, id]);
   res.json({ code: 0, message: '更新成功' });
 }
 
@@ -253,8 +254,8 @@ async function loadWithdrawalList(res, d) {
 }
 
 async function processWithdrawal(res, d) {
-  const { _id, action } = d;
-  if (action === 'complete') await db.query('UPDATE agent_withdrawals SET status = "completed", updated_at = NOW() WHERE id = ?', [_id]);
+  const { id, action } = d;
+  if (action === 'complete') await db.query('UPDATE agent_withdrawals SET status = "completed", updated_at = NOW() WHERE id = ?', [id]);
   res.json({ code: 0, message: '处理成功' });
 }
 
