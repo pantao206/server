@@ -241,7 +241,7 @@ async function updateAgent(res, d) {
 }
 
 async function deleteAgent(res, d) {
-  await db.query('DELETE FROM agents WHERE id = ?', [d.id]);
+  await db.query('DELETE FROM agents WHERE id = ?', [d._id]);
   res.json({ code: 0, message: '删除成功' });
 }
 
