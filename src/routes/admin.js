@@ -76,10 +76,11 @@ async function loadDashboard(res) {
 }
 
 async function loadUserList(res, d) {
-  const { page = 1, pageSize = 15, keyword = '' } = d;
+  const page = parseInt(d.page) || 1;
+  const pageSize = parseInt(d.pageSize) || 15;
   const offset = (page - 1) * pageSize;
   let where = '1=1', params = [];
-  if (keyword) { where += ' AND (nickname LIKE ? OR openid LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+  if (d.keyword) { where += ' AND (nickname LIKE ? OR openid LIKE ?)'; params.push(`%${d.keyword}%`, `%${d.keyword}%`); }
   const [list] = await db.query(`SELECT * FROM users WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
   const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM users WHERE ${where}`, params);
   res.json({ code: 0, data: { list, total } });
@@ -97,11 +98,12 @@ async function deleteUser(res, d) {
 }
 
 async function loadOrderList(res, d) {
-  const { page = 1, pageSize = 15, status = '', keyword = '' } = d;
+  const page = parseInt(d.page) || 1;
+  const pageSize = parseInt(d.pageSize) || 15;
   const offset = (page - 1) * pageSize;
   let where = '1=1', params = [];
-  if (status) { where += ' AND status = ?'; params.push(status); }
-  if (keyword) { where += ' AND (openid LIKE ? OR order_no LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+  if (d.status) { where += ' AND status = ?'; params.push(d.status); }
+  if (d.keyword) { where += ' AND (openid LIKE ? OR order_no LIKE ?)'; params.push(`%${d.keyword}%`, `%${d.keyword}%`); }
   const [list] = await db.query(`SELECT * FROM orders WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
   const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM orders WHERE ${where}`, params);
   res.json({ code: 0, data: { list, total } });
@@ -114,10 +116,11 @@ async function updateOrder(res, d) {
 }
 
 async function loadUsageList(res, d) {
-  const { page = 1, pageSize = 15, status = '' } = d;
+  const page = parseInt(d.page) || 1;
+  const pageSize = parseInt(d.pageSize) || 15;
   const offset = (page - 1) * pageSize;
   let where = '1=1', params = [];
-  if (status) { where += ' AND status = ?'; params.push(status); }
+  if (d.status) { where += ' AND status = ?'; params.push(d.status); }
   const [list] = await db.query(`SELECT * FROM usage_records WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
   const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM usage_records WHERE ${where}`, params);
   res.json({ code: 0, data: { list, total } });
@@ -217,11 +220,12 @@ async function uploadHairstyleImage(res, d) {
 }
 
 async function loadAgentList(res, d) {
-  const { page = 1, pageSize = 15, status = '', keyword = '' } = d;
+  const page = parseInt(d.page) || 1;
+  const pageSize = parseInt(d.pageSize) || 15;
   const offset = (page - 1) * pageSize;
   let where = '1=1', params = [];
-  if (status) { where += ' AND status = ?'; params.push(status); }
-  if (keyword) { where += ' AND (name LIKE ? OR phone LIKE ? OR code LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`); }
+  if (d.status) { where += ' AND status = ?'; params.push(d.status); }
+  if (d.keyword) { where += ' AND (name LIKE ? OR phone LIKE ? OR code LIKE ?)'; params.push(`%${d.keyword}%`, `%${d.keyword}%`, `%${d.keyword}%`); }
   const [list] = await db.query(`SELECT * FROM agents WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
   const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM agents WHERE ${where}`, params);
   res.json({ code: 0, data: { list, total } });
