@@ -961,15 +961,15 @@ function renderAgentTable(list) {
 
     let actions = '';
     if (a.status === 'pending') {
-      actions = `<button class="btn btn-sm btn-success" onclick="approveAgent('${a._id}')">批准</button>
-                 <button class="btn btn-sm btn-danger" onclick="rejectAgent('${a._id}')">拒绝</button>`;
+      actions = `<button class="btn btn-sm btn-success" onclick="approveAgent('${a.id}')">批准</button>
+                 <button class="btn btn-sm btn-danger" onclick="rejectAgent('${a.id}')">拒绝</button>`;
     } else if (a.status === 'active') {
       actions = `<button class="btn btn-sm btn-outline" onclick='copyAgentLink("${a.code}", "${a.name || ''}")'>📎 复制链接</button>
                  <button class="btn btn-sm btn-outline" onclick='showAgentModal(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
-                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a._id}')">删除</button>`;
+                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a.id}')">删除</button>`;
     } else {
       actions = `<button class="btn btn-sm btn-outline" onclick='showAgentModal(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
-                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a._id}')">删除</button>`;
+                 <button class="btn btn-sm btn-danger" onclick="deleteAgent('${a.id}')">删除</button>`;
     }
 
     return `<tr>
@@ -1038,13 +1038,13 @@ async function rejectAgent(id) {
 
 function showAgentModal(agent) {
   const a = agent || {};
-  showModal(a._id ? '编辑代理' : '新增代理', `
+  showModal(a.id ? '编辑代理' : '新增代理', `
     <div class="form-group"><label>姓名</label><input type="text" id="editAgName" value="${a.name || ''}"></div>
     <div class="form-group"><label>手机号</label><input type="text" id="editAgPhone" value="${a.phone || ''}"></div>
-    ${!a._id ? '<div class="form-group"><label>邀请码 (留空自动生成)</label><input type="text" id="editAgCode" value=""></div>' : ''}
+    ${!a.id ? '<div class="form-group"><label>邀请码 (留空自动生成)</label><input type="text" id="editAgCode" value=""></div>' : ''}
     <div class="form-group"><label>佣金比例 (%)</label><input type="number" id="editAgCommission" value="${a.commission || 30}" min="0" max="100"></div>
     <div class="form-group"><label>状态</label><select id="editAgStatus"><option value="active" ${a.status === 'active' ? 'selected' : ''}>正常</option><option value="disabled" ${a.status === 'disabled' ? 'selected' : ''}>禁用</option></select></div>
-    ${a._id ? `<div class="form-group"><label>余额</label><input type="number" id="editAgBalance" value="${a.balance || 0}"></div>` : ''}
+    ${a.id ? `<div class="form-group"><label>余额</label><input type="number" id="editAgBalance" value="${a.balance || 0}"></div>` : ''}
   `, async () => {
     const data = {
       name: document.getElementById('editAgName').value,
@@ -1052,8 +1052,8 @@ function showAgentModal(agent) {
       commission: document.getElementById('editAgCommission').value,
       status: document.getElementById('editAgStatus').value
     };
-    if (a._id) {
-      data._id = a._id;
+    if (a.id) {
+      data._id = a.id;
       data.balance = document.getElementById('editAgBalance').value;
       await callAdmin('agentUpdate', data);
     } else {
