@@ -247,6 +247,12 @@ async function updateAgent(res, d) {
     return res.json({ code: 0, message: '已拒绝并删除申请' });
   }
 
+  // 批准申请时只更新 status，不更新 name/phone（否则会覆盖成 null）
+  if (status === 'active' && !name && !phone) {
+    await db.query('UPDATE agents SET status = ? WHERE id = ?', [status, _id]);
+    return res.json({ code: 0, message: '更新成功' });
+  }
+
   await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?',
     [name || null, phone || null, commission || null, status || null, balance || null, _id]);
   res.json({ code: 0, message: '更新成功' });
