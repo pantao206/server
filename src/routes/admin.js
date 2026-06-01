@@ -240,6 +240,13 @@ async function createAgent(res, d) {
 
 async function updateAgent(res, d) {
   const { _id, name, phone, commission, status, balance } = d;
+
+  // 拒绝申请时直接删除记录
+  if (status === 'rejected') {
+    await db.query('DELETE FROM agents WHERE id = ? AND status = "pending"', [_id]);
+    return res.json({ code: 0, message: '已拒绝并删除申请' });
+  }
+
   await db.query('UPDATE agents SET name = ?, phone = ?, commission = ?, status = ?, balance = ? WHERE id = ?',
     [name || null, phone || null, commission || null, status || null, balance || null, _id]);
   res.json({ code: 0, message: '更新成功' });
