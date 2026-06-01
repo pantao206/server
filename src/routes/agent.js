@@ -128,6 +128,12 @@ router.post('/applyWithdraw', async (req, res) => {
       [agent.id, agent.name, agent.phone, alipayAccount, alipayName, amount, withdrawNo]
     );
 
+    // 记录佣金明细（提现支出）
+    await db.query(
+      'INSERT INTO agent_incomes (agent_id, openid, source, description, amount, status, created_at) VALUES (?, ?, "withdraw", ?, ?, "completed", NOW())',
+      [agent.id, openid, `提现申请（${withdrawNo}）`, -amount]
+    );
+
     res.json({ code: 0, message: '申请成功，请等待审核' });
   } catch (err) {
     res.json({ code: -1, message: err.message });

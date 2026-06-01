@@ -1091,31 +1091,33 @@ function renderWithdrawalTable(list) {
     return;
   }
   tbody.innerHTML = list.map(w => {
-    const statusMap = { pending: ['待转账', 'badge-warning'], completed: ['已完成转账', 'badge-success'] };
+    const statusMap = { pending: ['待处理', 'badge-warning'], completed: ['已完成', 'badge-success'], rejected: ['已拒绝', 'badge-danger'] };
     const [statusText, statusClass] = statusMap[w.status] || [w.status, 'badge-default'];
     const actions = w.status === 'pending'
-      ? `<button class="btn btn-sm btn-success" onclick="processWithdrawal('${w._id}', 'complete')">确认完成转账</button>`
+      ? `<button class="btn btn-sm btn-success" onclick="processWithdrawal('${w.id}', 'complete')">通过</button>
+         <button class="btn btn-sm btn-danger" onclick="processWithdrawal('${w.id}', 'reject')">拒绝</button>`
       : `<span class="badge ${statusClass}">${statusText}</span>`;
     return `<tr>
-      <td>${w.withdrawNo || '-'}</td>
+      <td>${w.withdraw_no || '-'}</td>
       <td>${w.agentName || '-'}</td>
       <td>${w.agentPhone || '-'}</td>
-      <td>${w.alipayAccount || '-'}</td>
-      <td>${w.alipayName || '-'}</td>
+      <td>${w.alipay_account || '-'}</td>
+      <td>${w.alipay_name || '-'}</td>
       <td><strong style="color:#e74c3c">${w.amount || 0}</strong></td>
       <td><strong style="color:#27ae60">${w.agentBalance || 0}</strong></td>
       <td><span class="badge ${statusClass}">${statusText}</span></td>
-      <td>${formatDate(w.createdAt)}</td>
+      <td>${formatDate(w.created_at)}</td>
       <td class="actions">${actions}</td>
     </tr>`;
   }).join('');
 }
 
 async function processWithdrawal(id, action) {
-  if (!confirm('确定该提现已完成转账？')) return;
+  const msg = action === 'complete' ? '确定通过该提现申请？' : '确定拒绝该提现申请？余额将退还给代理';
+  if (!confirm(msg)) return;
   try {
     await callAdmin('processWithdrawal', { _id: id, action });
-    showToast('已确认完成转账');
+    showToast(action === 'complete' ? '已通过' : '已拒绝');
     loadWithdrawals();
   } catch (err) {
     showToast(err.message || '操作失败', 'error');

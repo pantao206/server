@@ -273,8 +273,33 @@ async function loadWithdrawalList(res, d) {
 
 async function processWithdrawal(res, d) {
   const { id, action } = d;
-  if (action === 'complete') await db.query('UPDATE agent_withdrawals SET status = "completed", updated_at = NOW() WHERE id = ?', [id]);
-  res.json({ code: 0, message: '处理成功' });
+
+  // 获取提现记录
+  const [withdrawals] = await db.query('SELECT * FROM agent_withdrawals WHERE id = ?', [id]);
+  if (withdrawals.length === 0) return res.json({ code: -1, message: '提现记录不存在' });
+  const withdrawal = withdrawals[0];
+
+  if (action === 'complete') {
+    // 通过：标记已完成
+    await db.query('UPDATE agent_withdrawals SET status = "completed", updated_at = NOW() WHERE id = ?', [id]);
+    res.json({ code: 0, message: '已通过，提现完成' });
+  } else if (action === 'reject') {
+    // 拒绝：退还余额给代理
+    await db.query('UPDATE agents SET balance = balance + ? WHERE id = ?', [withdrawal.amount, withdrawal.agent_id]);
+
+    // 更新提现状态
+    await db.query('UPDATE agent_withdrawals SET status = "rejected", updated_at = NOW() WHERE id = ?', [id]);
+
+    // 记录退款到佣金明细
+    await db.query(
+      'INSERT INTO agent_incomes (agent_id, openid, source, description, amount, status, created_at) VALUES (?, ?, "withdraw_refund", ?, ?, "completed", NOW())',
+      [withdrawal.agent_id, null, `提现拒绝退款（${withdrawal.withdraw_no}）`, withdrawal.amount]
+    );
+
+    res.json({ code: 0, message: '已拒绝，余额已退还' });
+  } else {
+    res.json({ code: -1, message: '未知操作' });
+  }
 }
 
 async function getConfig(res) {
