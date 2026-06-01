@@ -1098,15 +1098,15 @@ function renderWithdrawalTable(list) {
          <button class="btn btn-sm btn-danger" onclick="processWithdrawal('${w.id}', 'reject')">拒绝</button>`
       : `<span class="badge ${statusClass}">${statusText}</span>`;
     return `<tr>
-      <td>${w.withdraw_no || '-'}</td>
+      <td>${w.withdrawNo || '-'}</td>
       <td>${w.agentName || '-'}</td>
       <td>${w.agentPhone || '-'}</td>
-      <td>${w.alipay_account || '-'}</td>
-      <td>${w.alipay_name || '-'}</td>
+      <td>${w.alipayAccount || '-'}</td>
+      <td>${w.alipayName || '-'}</td>
       <td><strong style="color:#e74c3c">${w.amount || 0}</strong></td>
       <td><strong style="color:#27ae60">${w.agentBalance || 0}</strong></td>
       <td><span class="badge ${statusClass}">${statusText}</span></td>
-      <td>${formatDate(w.created_at)}</td>
+      <td>${formatDate(w.createdAt)}</td>
       <td class="actions">${actions}</td>
     </tr>`;
   }).join('');
