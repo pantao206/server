@@ -8,30 +8,49 @@ router.post('/getInfo', async (req, res) => {
     const openid = req.headers['x-openid'];
     if (!openid) return res.json({ code: -1, message: '未登录' });
 
-    // 检查是否是代理
+    // 先检查是否有任何状态的代理申请
     const [agents] = await db.query('SELECT * FROM agents WHERE openid = ?', [openid]);
-    
+
     if (agents.length === 0) {
-      // 检查是否有待审核申请
-      const [pending] = await db.query('SELECT * FROM agents WHERE openid = ? AND status = "pending"', [openid]);
       return res.json({
         code: 0,
-        data: { isAgent: false, hasPendingApplication: pending.length > 0, pendingAgent: pending[0] || null }
+        data: { isAgent: false, hasPendingApplication: false }
       });
     }
 
     const agent = agents[0];
+
+    // 只有 active 状态才算正式代理
+    if (agent.status === 'active') {
+      return res.json({
+        code: 0,
+        data: {
+          isAgent: true,
+          hasPendingApplication: false,
+          agentId: agent.id,
+          code: agent.code,
+          name: agent.name,
+          phone: agent.phone,
+          balance: agent.balance,
+          totalEarned: agent.total_earned,
+          totalReferred: agent.total_referred
+        }
+      });
+    }
+
+    // pending 或其他非active状态 -> 待审核
     return res.json({
       code: 0,
       data: {
-        isAgent: true,
-        agentId: agent.id,
-        code: agent.code,
-        name: agent.name,
-        phone: agent.phone,
-        balance: agent.balance,
-        totalEarned: agent.total_earned,
-        totalReferred: agent.total_referred
+        isAgent: false,
+        hasPendingApplication: true,
+        pendingAgent: {
+          id: agent.id,
+          name: agent.name,
+          phone: agent.phone,
+          status: agent.status,
+          createdAt: agent.created_at
+        }
       }
     });
   } catch (err) {
