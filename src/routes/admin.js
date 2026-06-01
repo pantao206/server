@@ -266,7 +266,7 @@ async function deleteAgent(res, d) {
 async function loadWithdrawalList(res, d) {
   const { status = '' } = d;
   let where = '1=1', params = [];
-  if (status) { where += ' AND status = ?'; params.push(status); }
+  if (status) { where += ' AND w.status = ?'; params.push(status); }
   const [list] = await db.query(`SELECT w.*, a.name as agentName, a.phone as agentPhone, a.balance as agentBalance FROM agent_withdrawals w LEFT JOIN agents a ON w.agent_id = a.id WHERE ${where} ORDER BY w.created_at DESC`, params);
   res.json({ code: 0, data: { list } });
 }
