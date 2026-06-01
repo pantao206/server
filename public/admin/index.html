@@ -1019,6 +1019,7 @@ function fallbackCopy(text) {
 }
 
 async function approveAgent(id) {
+  if (!id || id === 'undefined') return showToast('无效的代理ID', 'error');
   if (!confirm('确定批准该代理申请？批准后用户将成为正式代理。')) return;
   try {
     await callAdmin('agentUpdate', { _id: id, status: 'active' });
@@ -1028,6 +1029,7 @@ async function approveAgent(id) {
 }
 
 async function rejectAgent(id) {
+  if (!id || id === 'undefined') return showToast('无效的代理ID', 'error');
   if (!confirm('确定拒绝该代理申请？')) return;
   try {
     await callAdmin('agentUpdate', { _id: id, status: 'rejected' });
